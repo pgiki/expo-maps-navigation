@@ -62,24 +62,6 @@ function isPublicDemoOsrm(url: string | undefined): boolean {
   return base === DEFAULT_OSRM_BASE_URL;
 }
 
-function routeIdentity(route: {
-  distanceM: number;
-  durationS: number;
-  polyline: { latitude: number; longitude: number }[];
-}): string {
-  const first = route.polyline[0];
-  const last = route.polyline[route.polyline.length - 1];
-  return [
-    route.distanceM,
-    route.durationS,
-    route.polyline.length,
-    first?.latitude,
-    first?.longitude,
-    last?.latitude,
-    last?.longitude,
-  ].join(':');
-}
-
 export default function ExpoMapsNavigation(props: MapNavigationProps) {
   const {
     style,
@@ -238,6 +220,7 @@ export default function ExpoMapsNavigation(props: MapNavigationProps) {
     loading,
     rerouting,
     error,
+    routeGeneration,
   } = useOsrmRoute({
     startPoint,
     endPoint,
@@ -260,6 +243,32 @@ export default function ExpoMapsNavigation(props: MapNavigationProps) {
     setPermError(undefined);
     setPermTick((n) => n + 1);
   }, []);
+
+  const handleSessionError = useCallback(
+    (message: string) => {
+      onError?.({ message });
+    },
+    [onError]
+  );
+
+  const features = useMemo(
+    () => ({
+      simulateRoute: shouldSimulateRoute,
+      statusHidden: hideStatusView,
+      cancelButton: showCancelButton,
+      endFeedback: showsEndOfRouteFeedback,
+      autoReroute: rerouteEnabled,
+      backgroundLocation: enableBackgroundLocation,
+    }),
+    [
+      shouldSimulateRoute,
+      hideStatusView,
+      showCancelButton,
+      showsEndOfRouteFeedback,
+      rerouteEnabled,
+      enableBackgroundLocation,
+    ]
+  );
 
   if (!prepared) {
     return (
@@ -321,9 +330,9 @@ export default function ExpoMapsNavigation(props: MapNavigationProps) {
 
   return (
     <NavigationActiveSession
-      key={routeIdentity(route)}
       style={style}
       route={route}
+      routeGeneration={routeGeneration}
       alternatives={alternatives}
       startPoint={startPoint}
       endPoint={endPoint}
@@ -334,14 +343,7 @@ export default function ExpoMapsNavigation(props: MapNavigationProps) {
       mute={mute}
       setMute={setMute}
       simulationSpeedMultiplier={simulationSpeedMultiplier}
-      features={{
-        simulateRoute: shouldSimulateRoute,
-        statusHidden: hideStatusView,
-        cancelButton: showCancelButton,
-        endFeedback: showsEndOfRouteFeedback,
-        autoReroute: rerouteEnabled,
-        backgroundLocation: enableBackgroundLocation,
-      }}
+      features={features}
       rerouting={rerouting}
       userMarker={resolvedUserMarker}
       defaultStartIcon={defaultStartPin ?? undefined}
@@ -356,7 +358,7 @@ export default function ExpoMapsNavigation(props: MapNavigationProps) {
       onLocationChange={onLocationChange}
       onRouteProgressChange={onRouteProgressChange}
       onArrive={onArrive}
-      onError={(message) => onError?.({ message })}
+      onError={handleSessionError}
       onOffRoute={onOffRoute}
       onReroute={onReroute}
       onRerouteFailed={onRerouteFailed}

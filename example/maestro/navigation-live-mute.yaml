@@ -1,0 +1,51 @@
+appId: com.example.expomapsnavigation
+---
+# Live GPS mute: toggle mute while feeding on-route locations; chrome stays; unmute; cancel.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Live GPS Navigation"
+    timeout: 90000
+- setLocation:
+    latitude: 30.699239
+    longitude: 76.6905161
+- tapOn: "Start Live GPS Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "mute-button"
+- setLocation:
+    latitude: 30.7005
+    longitude: 76.6915
+- tapOn:
+    id: "mute-button"
+# More on-route fixes while muted (no crash; chrome stays)
+- setLocation:
+    latitude: 30.701982
+    longitude: 76.693183
+- setLocation:
+    latitude: 30.7035
+    longitude: 76.6915
+- assertVisible:
+    id: "navigation-view"
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "trip-progress"
+- assertVisible:
+    id: "mute-button"
+- takeScreenshot: live-muted-on-route
+- tapOn:
+    id: "mute-button"
+- assertVisible:
+    id: "navigation-view"
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000
+- assertNotVisible:
+    id: "navigation-view"

@@ -1,0 +1,52 @@
+appId: com.example.expomapsnavigation
+---
+# Live GPS progress: fast corridor jumps; chrome updates; cancel → home.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Live GPS Navigation"
+    timeout: 90000
+- setLocation:
+    latitude: 30.699239
+    longitude: 76.6905161
+- tapOn: "Start Live GPS Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "trip-progress"
+- assertVisible:
+    id: "trip-eta"
+# Mid corridor (shop) then near end — instant fixes, no crawl
+- setLocation:
+    latitude: 30.701982
+    longitude: 76.693183
+- extendedWaitUntil:
+    visible:
+      id: "trip-distance"
+    timeout: 15000
+- assertVisible:
+    id: "navigation-view"
+- assertVisible:
+    id: "maneuver-banner"
+- setLocation:
+    latitude: 30.7075
+    longitude: 76.694
+- assertVisible:
+    id: "trip-progress"
+- assertVisible:
+    id: "trip-eta"
+- takeScreenshot: live-progress-near-end
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000
+- assertVisible:
+    id: "home-screen"
+- assertNotVisible:
+    id: "navigation-view"

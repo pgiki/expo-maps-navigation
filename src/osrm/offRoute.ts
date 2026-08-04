@@ -8,10 +8,25 @@ import {
 export const OFF_ROUTE_THRESHOLD_M = 50;
 
 /** Consecutive off-route GPS samples required before firing a reroute. */
-export const OFF_ROUTE_CONSECUTIVE = 3;
+export const OFF_ROUTE_CONSECUTIVE = 5;
 
-/** Grace period after a reroute attempt before detecting off-route again. */
+/** Minimum continuous off-route duration (ms) before firing a reroute. */
+export const OFF_ROUTE_MIN_DURATION_MS = 3000;
+
+/** Assumed horizontal accuracy (m) when the OS reports none / ≤0. */
+export const OFF_ROUTE_ASSUMED_ACCURACY_M = 30;
+
+/** Minimum accuracy slack (m) added to the corridor threshold. */
+export const OFF_ROUTE_MIN_ACCURACY_SLACK_M = 25;
+
+/** Grace after a successful reroute before detecting off-route again. */
 export const REROUTE_COOLDOWN_MS = 8000;
+
+/** Backoff after a failed reroute before retrying. */
+export const REROUTE_FAIL_BACKOFF_MS = 15000;
+
+/** Suppress off-route detection at session / soft-swap start. */
+export const REROUTE_STARTUP_GRACE_MS = 15000;
 
 export type NearestPointResult = {
   point: LatLng;
@@ -59,14 +74,44 @@ export function courseAlongRoute(
 }
 
 /**
+ * Effective off-route distance threshold for a GPS sample.
+ * Adds accuracy slack so urban noise / unknown accuracy does not false-fire.
+ */
+export function effectiveOffRouteThresholdM(
+  accuracyM = 0,
+  thresholdM = OFF_ROUTE_THRESHOLD_M
+): number {
+  const reported =
+    accuracyM > 0 ? accuracyM : OFF_ROUTE_ASSUMED_ACCURACY_M;
+  return thresholdM + Math.max(reported, OFF_ROUTE_MIN_ACCURACY_SLACK_M);
+}
+
+/**
  * Whether a single GPS sample should count as off-route.
- * Threshold expands with reported horizontal accuracy.
+ * Threshold expands with reported (or assumed) horizontal accuracy.
  */
 export function isOffRouteSample(
   distanceM: number,
   accuracyM = 0,
   thresholdM = OFF_ROUTE_THRESHOLD_M
 ): boolean {
-  const effective = Math.max(thresholdM, (accuracyM || 0) * 1.5);
-  return distanceM > effective;
+  return distanceM > effectiveOffRouteThresholdM(accuracyM, thresholdM);
+}
+
+/**
+ * Whether consecutive off samples + continuous duration are enough to fire.
+ */
+export function isOffRouteConfirmed(input: {
+  streak: number;
+  offSinceMs: number;
+  nowMs?: number;
+  consecutive?: number;
+  minDurationMs?: number;
+}): boolean {
+  const now = input.nowMs ?? Date.now();
+  const consecutive = input.consecutive ?? OFF_ROUTE_CONSECUTIVE;
+  const minDuration = input.minDurationMs ?? OFF_ROUTE_MIN_DURATION_MS;
+  if (input.streak < consecutive) return false;
+  if (input.offSinceMs <= 0) return false;
+  return now - input.offSinceMs >= minDuration;
 }

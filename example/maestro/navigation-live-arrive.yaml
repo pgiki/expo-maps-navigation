@@ -1,0 +1,52 @@
+appId: com.example.expomapsnavigation
+---
+# Live GPS arrive: fast travel along corridor → end-of-route → Done → home.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Live GPS Navigation"
+    timeout: 90000
+- setLocation:
+    latitude: 30.699239
+    longitude: 76.6905161
+- tapOn: "Start Live GPS Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "trip-progress"
+# Race corridor (~1.2 km @ 0.2 km/s ≈ 6s), then linger at dest for arrive streak
+- travel:
+    points:
+      - "30.699239, 76.6905161"
+      - "30.701982, 76.693183"
+      - "30.704476, 76.690653"
+      - "30.7085, 76.695"
+    speed: 0.2
+- setLocation:
+    latitude: 30.709241
+    longitude: 76.695669
+- setLocation:
+    latitude: 30.709241
+    longitude: 76.695669
+- setLocation:
+    latitude: 30.709241
+    longitude: 76.695669
+- extendedWaitUntil:
+    visible:
+      id: "end-of-route"
+    timeout: 45000
+- assertVisible: "You have arrived"
+- takeScreenshot: live-arrive-confirmed
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000
+- assertVisible:
+    id: "home-screen"
+- assertNotVisible:
+    id: "navigation-view"

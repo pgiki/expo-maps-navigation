@@ -29,3 +29,15 @@ export type Language =
   | 'yo'
   | 'zh-Hans'
   | 'zh-Hant';
+
+/** BCP-47 locale tag for `expo-speech`. */
+export function speechLocale(language: Language): string {
+  switch (language) {
+    case 'zh-Hans':
+      return 'zh-CN';
+    case 'zh-Hant':
+      return 'zh-TW';
+    default:
+      return language;
+  }
+}

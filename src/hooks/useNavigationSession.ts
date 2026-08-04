@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import * as Speech from 'expo-speech';
 
@@ -9,9 +9,12 @@ import type {
   Waypoint,
   WaypointEvent,
 } from '../types';
+import type { Language } from '../locals';
+import { speechLocale } from '../locals';
 import type { OsrmRoute } from '../osrm/client';
 import {
   computeRemaining,
+  distanceAlongRouteMeters,
   interpolateAlongPolyline,
   polylineLengthMeters,
   resolveCurrentStep,
@@ -19,10 +22,12 @@ import {
 import {
   courseAlongRoute,
   distanceToRouteMeters,
+  isOffRouteConfirmed,
   isOffRouteSample,
-  OFF_ROUTE_CONSECUTIVE,
   OFF_ROUTE_THRESHOLD_M,
   REROUTE_COOLDOWN_MS,
+  REROUTE_FAIL_BACKOFF_MS,
+  REROUTE_STARTUP_GRACE_MS,
 } from '../osrm/offRoute';
 import { NavigationSmoother } from '../geo/smoothNavigation';
 import { resolveHeading } from '../geo/heading';
@@ -36,6 +41,8 @@ import { useLatestRef } from './useLatestRef';
 /** Used to suppress off-route near the destination. */
 const ARRIVE_OFFROUTE_GUARD_M = ARRIVE_ALONG_REMAINING_M;
 const TICK_MS = 250;
+/** Skip progress UI updates when remaining distance delta is below this (m). */
+const PROGRESS_UI_EPSILON_M = 2;
 
 type TravelMode = 'driving' | 'driving-traffic' | 'walking' | 'cycling';
 
@@ -52,25 +59,26 @@ function speedForMode(mode: TravelMode): number {
 
 type UseNavigationSessionArgs = {
   route: OsrmRoute | null;
+  /** Bumps on intentional route replace — soft-swaps session without remount. */
+  routeGeneration?: number;
   waypoints?: Waypoint[];
   endPoint: RoutePoint;
   shouldSimulateRoute?: boolean;
   /** Multiplier for simulated speed. @Default 1 */
   simulationSpeedMultiplier?: number;
   mute?: boolean;
+  language?: Language;
   travelMode?: TravelMode;
   enabled?: boolean;
   /** Automatic off-route detection (live GPS only). @Default true */
   rerouteEnabled?: boolean;
-  /** True while a reroute network request is in flight (suppress duplicate triggers). */
-  rerouteInFlight?: boolean;
   /** Opt-in background location (host must configure OS permissions). */
   enableBackgroundLocation?: boolean;
   onLocationChange?: (location: NavLocation) => void;
   onRouteProgressChange?: (progress: RouteProgress) => void;
   onArrive?: (point: WaypointEvent) => void;
   onError?: (message: string) => void;
-  /** Fired once after consecutive off-route samples (debounced). */
+  /** Fired once after confirmed off-route (time + samples). */
   onOffRoute?: (location: NavLocation) => void;
 };
 
@@ -83,19 +91,22 @@ export type NavigationSessionState = {
   currentInstruction: string;
   offRoute: boolean;
   distanceFromRouteM: number;
+  /** Call when a reroute network attempt finishes (starts cooldown). */
+  notifyRerouteSettled: (ok: boolean) => void;
 };
 
 export function useNavigationSession({
   route,
+  routeGeneration = 0,
   waypoints = [],
   endPoint,
   shouldSimulateRoute = false,
   simulationSpeedMultiplier = 1,
   mute = false,
+  language = 'en',
   travelMode = 'driving',
   enabled = true,
   rerouteEnabled = true,
-  rerouteInFlight = false,
   enableBackgroundLocation = false,
   onLocationChange,
   onRouteProgressChange,
@@ -117,11 +128,18 @@ export function useNavigationSession({
   /** Consecutive arrive-candidate samples per target key. */
   const arriveStreakRef = useRef<Map<string, number>>(new Map());
   const lastSpokenStepRef = useRef(-1);
-  const muteRef = useLatestRef(mute);
+  const languageRef = useLatestRef(language);
 
   const offRouteStreakRef = useRef(0);
+  const offRouteSinceRef = useRef(0);
   const lastRerouteAtRef = useRef(0);
+  const cooldownMsRef = useRef(REROUTE_STARTUP_GRACE_MS);
+  /** Sync in-flight guard (set in event / settle paths, not during render). */
+  const reroutePendingRef = useRef(false);
   const lastHeadingRef = useRef(0);
+  const lastProgressRemainingRef = useRef<number | null>(null);
+  const locationRef = useRef<NavLocation | null>(null);
+  const seededGenerationRef = useRef<number | null>(null);
   const smootherRef = useRef<NavigationSmoother | null>(null);
   if (smootherRef.current === null) {
     smootherRef.current = new NavigationSmoother();
@@ -130,7 +148,10 @@ export function useNavigationSession({
   const arrivedRef = useRef(false);
   const shouldSimulateRef = useLatestRef(shouldSimulateRoute);
   const rerouteEnabledRef = useLatestRef(rerouteEnabled);
-  const rerouteInFlightRef = useLatestRef(rerouteInFlight);
+  // GPS/sim callbacks are async; effect-synced refs are current by the next tick.
+  const routeRef = useLatestRef(route);
+  const waypointsListRef = useLatestRef(waypoints);
+  const endPointRef = useLatestRef(endPoint);
 
   const onLocationChangeRef = useLatestRef(onLocationChange);
   const onRouteProgressChangeRef = useLatestRef(onRouteProgressChange);
@@ -140,55 +161,114 @@ export function useNavigationSession({
 
   const currentInstruction = route?.steps[stepIndex]?.instruction ?? '';
 
-  // Tear down speech when session disabled (e.g. cancel)
+  const notifyRerouteSettled = useCallback((ok: boolean) => {
+    reroutePendingRef.current = false;
+    lastRerouteAtRef.current = Date.now();
+    cooldownMsRef.current = ok
+      ? REROUTE_COOLDOWN_MS
+      : REROUTE_FAIL_BACKOFF_MS;
+    offRouteStreakRef.current = 0;
+    offRouteSinceRef.current = 0;
+  }, []);
+
+  // Tear down speech when session disabled (e.g. cancel) or unmount
   useEffect(() => {
     if (!enabled) {
       Speech.stop();
     }
+    return () => {
+      Speech.stop();
+    };
   }, [enabled]);
 
-  // Speak on step change
+  // Speak on step change (skip while muted; muteRef is sync so races cannot speak)
   useEffect(() => {
     if (!route || !enabled) return;
     const step = route.steps[stepIndex];
     if (!step) return;
     if (lastSpokenStepRef.current === stepIndex) return;
     lastSpokenStepRef.current = stepIndex;
-    if (!muteRef.current && step.instruction) {
-      Speech.stop();
-      Speech.speak(step.instruction, { rate: 1.0 });
-    }
-  }, [stepIndex, route, enabled, muteRef]);
+    // Advance the spoken cursor while muted so unmute does not replay a backlog.
+    if (mute || !step.instruction) return;
+    Speech.stop();
+    Speech.speak(step.instruction, {
+      rate: 1.0,
+      language: speechLocale(languageRef.current),
+    });
+  }, [stepIndex, route, enabled, mute, languageRef]);
 
-  // Mute stops speech immediately
+  // Mute must stop any in-progress utterance immediately
   useEffect(() => {
-    if (mute) Speech.stop();
+    if (!mute) return;
+    Speech.stop();
   }, [mute]);
 
-  // Seed start pose on mount. Parent remounts this hook via `key` on route change.
+  // Soft route swap / initial seed when routeGeneration changes
   useEffect(() => {
-    if (!route?.polyline[0]) return;
-    const start = route.polyline[0];
-    const course = courseAlongRoute(start, route.polyline) ?? 0;
-    lastHeadingRef.current = course;
-    smoother.reset(start, course);
-    setLocation({
-      latitude: start.latitude,
-      longitude: start.longitude,
-      heading: course,
-      accuracy: 5,
-      speed: 0,
-    });
+    const activeRoute = routeRef.current;
+    if (!activeRoute?.polyline[0]) return;
+
+    const isFirst = seededGenerationRef.current === null;
+    const midTrip =
+      !isFirst && seededGenerationRef.current !== routeGeneration;
+
+    offRouteStreakRef.current = 0;
+    offRouteSinceRef.current = 0;
+    // Do not clear reroutePendingRef here — an in-flight attempt owns that flag
+    // until notifyRerouteSettled (avoids a window for duplicate fires).
+    setOffRoute(false);
+    setDistanceFromRouteM(0);
     lastRerouteAtRef.current = Date.now();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    cooldownMsRef.current = REROUTE_STARTUP_GRACE_MS;
+
+    if (isFirst || !locationRef.current) {
+      const start = activeRoute.polyline[0];
+      const course = courseAlongRoute(start, activeRoute.polyline) ?? 0;
+      lastHeadingRef.current = course;
+      smoother.reset(start, course);
+      const seeded: NavLocation = {
+        latitude: start.latitude,
+        longitude: start.longitude,
+        heading: course,
+        accuracy: 5,
+        speed: 0,
+      };
+      locationRef.current = seeded;
+      setLocation(seeded);
+      stepIndexRef.current = 0;
+      setStepIndex(0);
+      lastSpokenStepRef.current = -1;
+      simDistanceRef.current = 0;
+    } else if (midTrip) {
+      // Keep puck at last known location; re-snap step onto the new geometry.
+      const pos = locationRef.current;
+      const next = resolveCurrentStep(activeRoute.steps, pos, 0);
+      stepIndexRef.current = next;
+      setStepIndex(next);
+      // Avoid replaying the current step instruction after soft swap.
+      lastSpokenStepRef.current = next;
+      const course =
+        courseAlongRoute(pos, activeRoute.polyline) ?? lastHeadingRef.current;
+      lastHeadingRef.current = course;
+      smoother.reset(
+        { latitude: pos.latitude, longitude: pos.longitude },
+        course
+      );
+      // Keep simulation progress coherent with the new polyline.
+      const along = distanceAlongRouteMeters(activeRoute.polyline, pos);
+      if (Number.isFinite(along) && along >= 0) {
+        simDistanceRef.current = along;
+      }
+    }
+
+    seededGenerationRef.current = routeGeneration;
+  }, [routeGeneration, smoother, routeRef]);
 
   const processPosition = (
     pos: NavLocation,
     activeRoute: OsrmRoute,
     tickTravelM = 0
   ) => {
-    // Off-route uses raw GPS; puck/camera use smoothed snap; arrive uses both via Turf.
     const rawForArrive = pos;
 
     const headingIn = resolveHeading(pos.heading, lastHeadingRef.current);
@@ -212,15 +292,17 @@ export function useNavigationSession({
       accuracy: pos.accuracy,
       speed: pos.speed,
     };
+    locationRef.current = resolved;
     setLocation(resolved);
     onLocationChangeRef.current?.(resolved);
 
+    const prevStepIndex = stepIndexRef.current;
     const nextStep = resolveCurrentStep(
       activeRoute.steps,
       resolved,
-      stepIndexRef.current
+      prevStepIndex
     );
-    if (nextStep !== stepIndexRef.current) {
+    if (nextStep !== prevStepIndex) {
       stepIndexRef.current = nextStep;
       setStepIndex(nextStep);
     }
@@ -240,11 +322,21 @@ export function useNavigationSession({
       fractionTraveled: rem.fractionTraveled,
       distanceRemaining: rem.distanceRemaining,
     };
-    setProgress(progressPayload);
-    setDistanceToNextManeuver(rem.distanceToNextManeuver);
+
+    const prevRem = lastProgressRemainingRef.current;
+    const progressMoved =
+      prevRem == null ||
+      Math.abs(prevRem - rem.distanceRemaining) >= PROGRESS_UI_EPSILON_M;
+    if (progressMoved || nextStep !== prevStepIndex) {
+      lastProgressRemainingRef.current = rem.distanceRemaining;
+      setProgress(progressPayload);
+      setDistanceToNextManeuver(rem.distanceToNextManeuver);
+    }
     onRouteProgressChangeRef.current?.(progressPayload);
 
     const streakNeeded = arriveStreakRequired(shouldSimulateRef.current);
+    const wps = waypointsListRef.current;
+    const dest = endPointRef.current;
 
     const tryConfirmArrive = (
       key: string,
@@ -281,7 +373,7 @@ export function useNavigationSession({
       onArriveRef.current?.(event);
     };
 
-    waypoints.forEach((wp, i) => {
+    wps.forEach((wp, i) => {
       if (wp.separatesLegs === false) return;
       const key = `wp-${i}`;
       tryConfirmArrive(key, wp, {
@@ -292,13 +384,12 @@ export function useNavigationSession({
       });
     });
 
-    // OSRM "arrive" steps (end of each leg) — still require Turf confirmation
     const currentStep = activeRoute.steps[stepIndexRef.current];
     if (
       currentStep?.maneuver.type === 'arrive' &&
       currentStep.legIndex < (activeRoute.waypoints.length - 2 || 0)
     ) {
-      const wp = waypoints[currentStep.legIndex];
+      const wp = wps[currentStep.legIndex];
       if (wp && wp.separatesLegs !== false) {
         const key = `wp-${currentStep.legIndex}`;
         tryConfirmArrive(key, wp, {
@@ -310,12 +401,11 @@ export function useNavigationSession({
       }
     }
 
-    // Final destination
-    tryConfirmArrive('destination', endPoint, {
-      latitude: endPoint.latitude,
-      longitude: endPoint.longitude,
-      name: endPoint.name ?? endPoint.title ?? 'Destination',
-      index: waypoints.length,
+    tryConfirmArrive('destination', dest, {
+      latitude: dest.latitude,
+      longitude: dest.longitude,
+      name: dest.name ?? dest.title ?? 'Destination',
+      index: wps.length,
     });
 
     // Off-route detection — live GPS only (sim is glued to the polyline)
@@ -336,47 +426,57 @@ export function useNavigationSession({
         rawForArrive.accuracy
       );
       if (sampleOff) {
+        if (offRouteSinceRef.current === 0) {
+          offRouteSinceRef.current = Date.now();
+        }
         offRouteStreakRef.current += 1;
-        setOffRoute(true);
       } else {
         offRouteStreakRef.current = 0;
+        offRouteSinceRef.current = 0;
         setOffRoute(false);
       }
 
+      const confirmed = isOffRouteConfirmed({
+        streak: offRouteStreakRef.current,
+        offSinceMs: offRouteSinceRef.current,
+      });
+      setOffRoute(confirmed);
+
       const cooledDown =
-        Date.now() - lastRerouteAtRef.current >= REROUTE_COOLDOWN_MS;
-      if (
-        sampleOff &&
-        offRouteStreakRef.current >= OFF_ROUTE_CONSECUTIVE &&
-        cooledDown &&
-        !rerouteInFlightRef.current
-      ) {
-        lastRerouteAtRef.current = Date.now();
+        Date.now() - lastRerouteAtRef.current >= cooldownMsRef.current;
+      if (confirmed && cooledDown && !reroutePendingRef.current) {
+        offRouteStreakRef.current = 0;
+        offRouteSinceRef.current = 0;
+        reroutePendingRef.current = true;
         onOffRouteRef.current?.(rawForArrive);
       }
     } else if (shouldSimulateRef.current) {
       setOffRoute(false);
       setDistanceFromRouteM(0);
       offRouteStreakRef.current = 0;
+      offRouteSinceRef.current = 0;
     }
   };
 
-  // Simulation loop
+  // Simulation loop — keep interval across soft swaps via routeRef
   useEffect(() => {
-    if (!enabled || !route || !shouldSimulateRoute) return;
+    if (!enabled || !shouldSimulateRoute) return;
+    if (!routeRef.current) return;
 
     const speed =
       speedForMode(travelMode) * Math.max(0.1, simulationSpeedMultiplier);
-    const totalLen =
-      polylineLengthMeters(route.polyline) || route.distanceM;
-    const tickTravelM = speed * (TICK_MS / 1000);
     const interval = setInterval(() => {
+      const activeRoute = routeRef.current;
+      if (!activeRoute) return;
+      const totalLen =
+        polylineLengthMeters(activeRoute.polyline) || activeRoute.distanceM;
+      const tickTravelM = speed * (TICK_MS / 1000);
       simDistanceRef.current = Math.min(
         totalLen,
         simDistanceRef.current + tickTravelM
       );
       const { position, heading } = interpolateAlongPolyline(
-        route.polyline,
+        activeRoute.polyline,
         simDistanceRef.current
       );
       processPosition(
@@ -387,28 +487,28 @@ export function useNavigationSession({
           accuracy: 5,
           speed,
         },
-        route,
+        activeRoute,
         tickTravelM
       );
       if (simDistanceRef.current >= totalLen) {
-        // Snap to destination so arrive always fires at end of sim
+        const dest = endPointRef.current;
         const endHeading = heading;
         smoother.reset(
           {
-            latitude: endPoint.latitude,
-            longitude: endPoint.longitude,
+            latitude: dest.latitude,
+            longitude: dest.longitude,
           },
           endHeading
         );
         processPosition(
           {
-            latitude: endPoint.latitude,
-            longitude: endPoint.longitude,
+            latitude: dest.latitude,
+            longitude: dest.longitude,
             heading: endHeading,
             accuracy: 5,
             speed: 0,
           },
-          route,
+          activeRoute,
           tickTravelM
         );
         clearInterval(interval);
@@ -417,17 +517,12 @@ export function useNavigationSession({
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    enabled,
-    route,
-    shouldSimulateRoute,
-    travelMode,
-    simulationSpeedMultiplier,
-  ]);
+  }, [enabled, shouldSimulateRoute, travelMode, simulationSpeedMultiplier]);
 
-  // Live GPS
+  // Live GPS — keep subscription across soft route swaps
   useEffect(() => {
-    if (!enabled || !route || shouldSimulateRoute) return;
+    if (!enabled || shouldSimulateRoute) return;
+    if (!routeRef.current) return;
 
     let subscription: Location.LocationSubscription | null = null;
     let cancelled = false;
@@ -436,6 +531,7 @@ export function useNavigationSession({
       try {
         const { status } =
           await Location.requestForegroundPermissionsAsync();
+        if (cancelled) return;
         if (status !== 'granted') {
           onErrorRef.current?.('Location permission is not granted.');
           return;
@@ -449,27 +545,30 @@ export function useNavigationSession({
           }
         }
 
-        subscription = await Location.watchPositionAsync(
+        if (cancelled) return;
+
+        const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.BestForNavigation,
             timeInterval: TICK_MS,
             distanceInterval: 1,
             ...(enableBackgroundLocation
               ? {
-                  // May be ignored without host OS config; see docs/background-location.md
                   mayShowUserSettingsDialog: true,
                 }
               : {}),
           },
           (loc: Location.LocationObject) => {
-            if (cancelled || !route) return;
+            if (cancelled) return;
+            const activeRoute = routeRef.current;
+            if (!activeRoute) return;
             const courseFallback =
               courseAlongRoute(
                 {
                   latitude: loc.coords.latitude,
                   longitude: loc.coords.longitude,
                 },
-                route.polyline
+                activeRoute.polyline
               ) ?? lastHeadingRef.current;
             processPosition(
               {
@@ -482,11 +581,17 @@ export function useNavigationSession({
                     ? loc.coords.speed
                     : undefined,
               },
-              route
+              activeRoute
             );
           }
         );
+        if (cancelled) {
+          sub.remove();
+          return;
+        }
+        subscription = sub;
       } catch (e) {
+        if (cancelled) return;
         const message =
           e instanceof Error ? e.message : 'Failed to watch location.';
         onErrorRef.current?.(message);
@@ -498,7 +603,7 @@ export function useNavigationSession({
       subscription?.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, route, shouldSimulateRoute, enableBackgroundLocation]);
+  }, [enabled, shouldSimulateRoute, enableBackgroundLocation]);
 
   return {
     location,
@@ -509,5 +614,6 @@ export function useNavigationSession({
     currentInstruction,
     offRoute,
     distanceFromRouteM,
+    notifyRerouteSettled,
   };
 }

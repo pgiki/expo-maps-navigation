@@ -2,6 +2,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   type Ref,
 } from 'react';
@@ -78,6 +79,8 @@ type StreetLabel = {
   coordinates: { latitude: number; longitude: number };
   title: string;
 };
+
+const EMPTY_WAYPOINTS: Waypoint[] = [];
 
 type PolylineStyle = {
   id: string;
@@ -486,7 +489,7 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
       currentStepName,
       currentStepPoint,
       cameraLookAheadPoint,
-      waypoints = [],
+      waypoints = EMPTY_WAYPOINTS,
       userMarker,
       defaultStartIcon,
       defaultEndIcon,
@@ -666,31 +669,88 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
       onCameraMoveByUser?.();
     };
 
-    const streetLabel = buildStreetLabel(currentStepName, currentStepPoint);
-    const polylines = buildPolylines(
-      polyline,
-      alternativePolyline,
-      alternativePolylines
+    const polylines = useMemo(
+      () =>
+        buildPolylines(polyline, alternativePolyline, alternativePolylines),
+      [polyline, alternativePolyline, alternativePolylines]
     );
-    const userHalo = buildUserHalo(location);
+
     const originIcon = resolveIcon(startPoint) ?? defaultStartIcon;
     const destIcon = resolveIcon(endPoint) ?? defaultEndIcon;
     const userIcon = resolveIcon(userMarker);
     const originTitle = pointLabel(startPoint, 'Start');
     const destTitle = pointLabel(endPoint, 'Destination');
-    const markerInput = {
-      startPoint,
-      endPoint,
-      waypoints,
-      location,
-      streetLabel,
-      originIcon,
-      destIcon,
-      userIcon,
-      defaultViaIcon,
-      originTitle,
-      destTitle,
-    };
+
+    const streetLabel = useMemo(
+      () => buildStreetLabel(currentStepName, currentStepPoint),
+      [currentStepName, currentStepPoint]
+    );
+
+    const userHalo = useMemo(() => buildUserHalo(location), [location]);
+
+    const routeMarkerInput = useMemo(
+      () => ({
+        startPoint,
+        endPoint,
+        waypoints,
+        location: null as Location | null,
+        streetLabel: null as StreetLabel | null,
+        originIcon,
+        destIcon,
+        userIcon: undefined as MapMarkerImage | undefined,
+        defaultViaIcon,
+        originTitle,
+        destTitle,
+      }),
+      [
+        startPoint,
+        endPoint,
+        waypoints,
+        originIcon,
+        destIcon,
+        defaultViaIcon,
+        originTitle,
+        destTitle,
+      ]
+    );
+
+    const appleAnnotations = useMemo(() => {
+      const base = buildAppleAnnotations(routeMarkerInput);
+      const withStreet = streetLabel
+        ? [...base, streetLabel as unknown as Record<string, unknown>]
+        : base;
+      if (location && userIcon) {
+        return [
+          ...withStreet,
+          {
+            id: 'user',
+            coordinates: {
+              latitude: location.latitude,
+              longitude: location.longitude,
+            },
+            icon: userIcon,
+            anchor: { x: 0.5, y: 0.5 },
+          },
+        ];
+      }
+      return withStreet;
+    }, [routeMarkerInput, streetLabel, location, userIcon]);
+
+    const appleUserMarkers = useMemo(
+      () => buildAppleUserMarkers(location, userIcon, userMarker),
+      [location, userIcon, userMarker]
+    );
+
+    const googleMarkers = useMemo(
+      () =>
+        buildGoogleMarkers({
+          ...routeMarkerInput,
+          location,
+          streetLabel,
+          userIcon,
+        }),
+      [routeMarkerInput, location, streetLabel, userIcon]
+    );
 
     // Controlled seed only — never rewrite from live GPS while the user has
     // panned into free mode (that would yank the camera back to the puck).
@@ -702,8 +762,8 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
         <AppleNavMap
           mapRef={appleRef}
           cameraPosition={cameraPosition}
-          annotations={buildAppleAnnotations(markerInput)}
-          markers={buildAppleUserMarkers(location, userIcon, userMarker)}
+          annotations={appleAnnotations}
+          markers={appleUserMarkers}
           polylines={polylines}
           circles={userHalo}
           onCameraMove={handleCameraMove}
@@ -715,7 +775,7 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
       <GoogleNavMap
         mapRef={googleRef}
         cameraPosition={cameraPosition}
-        markers={buildGoogleMarkers(markerInput)}
+        markers={googleMarkers}
         polylines={polylines}
         circles={userHalo}
         showNativeMyLocation={!location}

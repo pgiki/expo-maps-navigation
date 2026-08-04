@@ -13,7 +13,7 @@ import ExpoMapsNavigation, {
   type Waypoint,
 } from 'expo-maps-navigation';
 
-type Mode = 'idle' | 'navigate' | 'fast' | 'error';
+type Mode = 'idle' | 'navigate' | 'live' | 'fast' | 'error';
 
 /**
  * Marker styles exercised in this example:
@@ -21,6 +21,11 @@ type Mode = 'idle' | 'navigate' | 'fast' | 'error';
  * - endPoint → `image` alias (PNG via useImage)
  * - waypoint 1 → `icon` (PNG)
  * - waypoint 2 → iOS `systemImage` + tintColor
+ *
+ * Modes:
+ * - navigate / fast → shouldSimulateRoute (polyline walk)
+ * - live → real GPS / Maestro setLocation (no simulation)
+ * - error → bad OSRM host
  */
 export default function App() {
   const [mode, setMode] = useState<Mode>('idle');
@@ -106,6 +111,20 @@ export default function App() {
             <Text style={styles.primaryBtnText}>Start Navigation</Text>
           </Pressable>
           <Pressable
+            testID="start-live-navigation"
+            accessibilityRole="button"
+            accessibilityLabel="Start Live GPS Navigation"
+            onPress={() => setMode('live')}
+            style={({ pressed }) => [
+              styles.secondaryBtn,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.secondaryBtnText}>
+              Start Live GPS Navigation
+            </Text>
+          </Pressable>
+          <Pressable
             testID="start-fast-simulation"
             accessibilityRole="button"
             accessibilityLabel="Start Fast Simulation"
@@ -146,7 +165,7 @@ export default function App() {
               : 'https://router.project-osrm.org'
           }
           style={styles.container}
-          shouldSimulateRoute={mode !== 'error'}
+          shouldSimulateRoute={mode === 'navigate' || mode === 'fast'}
           simulationSpeedMultiplier={mode === 'fast' ? 20 : 1}
           showCancelButton
           showsEndOfRouteFeedback={mode !== 'error'}

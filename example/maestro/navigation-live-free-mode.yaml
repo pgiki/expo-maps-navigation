@@ -1,0 +1,70 @@
+appId: com.example.expomapsnavigation
+---
+# Live GPS free mode: on-route fix → swipe follow surface → recenter → follow resumes.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Live GPS Navigation"
+    timeout: 90000
+- setLocation:
+    latitude: 30.699239
+    longitude: 76.6905161
+- tapOn: "Start Live GPS Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "map-follow-surface"
+- assertNotVisible:
+    id: "recenter-button"
+- setLocation:
+    latitude: 30.7005
+    longitude: 76.6915
+- swipe:
+    from:
+      id: "map-follow-surface"
+    start: 80%, 45%
+    end: 20%, 50%
+    duration: 400
+- waitForAnimationToEnd
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: "recenter-button"
+          commands:
+            - swipe:
+                start: 22%, 40%
+                end: 78%, 46%
+                duration: 400
+            - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "recenter-button"
+    timeout: 15000
+- assertNotVisible:
+    id: "map-follow-surface"
+- takeScreenshot: live-free-mode-after-pan
+- tapOn:
+    id: "recenter-button"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    notVisible:
+      id: "recenter-button"
+    timeout: 10000
+- assertVisible:
+    id: "map-follow-surface"
+- assertVisible:
+    id: "navigation-view"
+- takeScreenshot: live-follow-resumed
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000

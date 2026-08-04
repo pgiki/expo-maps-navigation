@@ -1,5 +1,7 @@
 # Course-up camera patch (expo-maps 57)
 
+> **Branch note:** The library’s `expo-55` line peers against **Expo SDK 55 / expo-maps ~55**. This patch file targets **expo-maps 57.0.1** and will not apply cleanly on SDK 55. Port the patch or stay north-up on 55 until a matching patch ships.
+
 Stock **expo-maps ~57.0.1** ignores `bearing` in `setCameraPosition`:
 
 - **iOS** builds an `MKCoordinateRegion` without heading

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import * as Speech from 'expo-speech';
@@ -15,6 +22,7 @@ import type {
   RouteProgress,
 } from '../types';
 import type { Language } from '../locals';
+import { speechLocale } from '../locals';
 import type { OsrmRoute } from '../osrm/client';
 import { t } from '../i18n/strings';
 import { useNavigationSession } from '../hooks/useNavigationSession';
@@ -49,6 +57,7 @@ function stepMidpoint(
 export type NavigationActiveSessionProps = {
   style?: StyleProp<ViewStyle>;
   route: OsrmRoute;
+  routeGeneration: number;
   alternatives: OsrmRoute[];
   startPoint: RoutePoint;
   endPoint: RoutePoint;
@@ -85,7 +94,7 @@ export type NavigationActiveSessionProps = {
   rerouteFrom: (
     origin: { latitude: number; longitude: number },
     options?: { currentLegIndex?: number }
-  ) => Promise<boolean>;
+  ) => Promise<boolean | 'aborted'>;
   onLocationChange?: (location: NavLocation) => void;
   onRouteProgressChange?: (progress: RouteProgress) => void;
   onArrive?: (point: WaypointEvent) => void;
@@ -98,12 +107,13 @@ export type NavigationActiveSessionProps = {
 };
 
 /**
- * Mounted with a `key` derived from the active route so session state resets
- * cleanly on reroute without render-phase ref/state adjustment effects.
+ * Active turn-by-turn session. Soft-swaps when `routeGeneration` changes
+ * (reroute / alt cycle) without remounting the map or GPS watch.
  */
 export function NavigationActiveSession({
   style,
   route,
+  routeGeneration,
   alternatives,
   startPoint,
   endPoint,
@@ -141,42 +151,66 @@ export function NavigationActiveSession({
   const mapRef = useRef<NavigationMapHandle>(null);
   const muteRef = useLatestRef(mute);
   const stepIndexRef = useRef(0);
+  const locationRef = useRef<NavLocation | null>(null);
+  const routeStepsRef = useLatestRef(route.steps);
 
   const onOffRouteRef = useLatestRef(onOffRoute);
   const onRerouteRef = useLatestRef(onReroute);
   const onRerouteFailedRef = useLatestRef(onRerouteFailed);
   const rerouteFromRef = useLatestRef(rerouteFrom);
   const languageRef = useLatestRef(language);
+  const notifyRerouteSettledRef = useRef<(ok: boolean) => void>(() => {});
 
-  const handleOffRoute = useCallback((loc: NavLocation) => {
-    onOffRouteRef.current?.(loc);
-    if (!muteRef.current) {
-      Speech.stop();
-      Speech.speak(t('recalculating', languageRef.current), { rate: 1.0 });
-    }
-    const legIndex = route.steps[stepIndexRef.current]?.legIndex ?? 0;
-    void rerouteFromRef.current(loc, { currentLegIndex: legIndex }).then((ok) => {
-      if (ok) {
-        onRerouteRef.current?.({ location: loc });
-      } else {
-        onRerouteFailedRef.current?.({
-          message: 'Unable to recalculate route.',
-        });
-      }
-    });
-  }, [route.steps, muteRef, onOffRouteRef, onRerouteRef, onRerouteFailedRef, rerouteFromRef, languageRef]);
+  const handleOffRoute = useCallback(
+    (loc: NavLocation) => {
+      onOffRouteRef.current?.(loc);
+      const legIndex =
+        routeStepsRef.current[stepIndexRef.current]?.legIndex ?? 0;
+      void rerouteFromRef.current(loc, { currentLegIndex: legIndex }).then(
+        (result) => {
+          // Aborted attempts must not settle cooldown — a newer attempt owns it.
+          if (result === 'aborted') return;
+          notifyRerouteSettledRef.current(result);
+          if (result) {
+            if (!muteRef.current) {
+              Speech.stop();
+              Speech.speak(t('recalculating', languageRef.current), {
+                rate: 1.0,
+                language: speechLocale(languageRef.current),
+              });
+            }
+            onRerouteRef.current?.({ location: loc });
+          } else {
+            onRerouteFailedRef.current?.({
+              message: 'Unable to recalculate route.',
+            });
+          }
+        }
+      );
+    },
+    [
+      onOffRouteRef,
+      onRerouteRef,
+      onRerouteFailedRef,
+      rerouteFromRef,
+      languageRef,
+      routeStepsRef,
+      muteRef,
+    ]
+  );
 
   const session = useNavigationSession({
     route,
+    routeGeneration,
     waypoints,
     endPoint,
     shouldSimulateRoute: features.simulateRoute,
     simulationSpeedMultiplier,
     mute,
+    language,
     travelMode,
     enabled: true,
     rerouteEnabled: features.autoReroute && !features.simulateRoute,
-    rerouteInFlight: rerouting,
     enableBackgroundLocation: features.backgroundLocation,
     onLocationChange,
     onRouteProgressChange,
@@ -186,34 +220,66 @@ export function NavigationActiveSession({
   });
 
   useEffect(() => {
+    notifyRerouteSettledRef.current = session.notifyRerouteSettled;
+  }, [session.notifyRerouteSettled]);
+
+  useEffect(() => {
     stepIndexRef.current = session.stepIndex;
   }, [session.stepIndex]);
 
-  const initialZoom = zoomForSpanMeters(
-    Math.max(200, distanceMeters(startPoint, endPoint) || route.distanceM)
+  useEffect(() => {
+    locationRef.current = session.location;
+  }, [session.location]);
+
+  const initialZoom = useMemo(
+    () =>
+      zoomForSpanMeters(
+        Math.max(
+          200,
+          distanceMeters(startPoint, endPoint) || route.distanceM
+        )
+      ),
+    [startPoint, endPoint, route.distanceM]
   );
+
+  const handleBreakFollow = useCallback(() => {
+    setFollowUser(false);
+  }, []);
+
+  const handleToggleMute = useCallback(() => {
+    setMute((m) => {
+      const next = !m;
+      // Stop current utterance immediately when muting (don't wait for effects).
+      if (next) {
+        Speech.stop();
+      }
+      return next;
+    });
+  }, [setMute]);
 
   const handleCompass = useCallback(() => {
     setFollowUser(true);
-    if (session.location) {
+    const loc = locationRef.current;
+    if (loc) {
       mapRef.current?.setCameraPosition({
-        coordinates: session.location,
+        coordinates: loc,
         zoom: 16,
         bearing: 0,
       });
     }
-  }, [session.location]);
+  }, []);
 
   const handleRecenter = useCallback(() => {
     setFollowUser(true);
-    if (session.location) {
+    const loc = locationRef.current;
+    if (loc) {
       mapRef.current?.setCameraPosition({
-        coordinates: session.location,
+        coordinates: loc,
         zoom: 16,
-        bearing: session.location.heading,
+        bearing: loc.heading,
       });
     }
-  }, [session.location]);
+  }, []);
 
   const step = route.steps[session.stepIndex];
   const showFeedback =
@@ -231,7 +297,21 @@ export function NavigationActiveSession({
   const sheetHeight =
     bottomOffsetProp ??
     (features.statusHidden ? 24 : Math.max(120, bottomInset + 100));
-  const altPolylines = alternatives.map((a) => a.polyline);
+  const altPolylines = useMemo(
+    () => alternatives.map((a) => a.polyline),
+    [alternatives]
+  );
+
+  const currentStepPoint = useMemo(
+    () => stepMidpoint(route.steps, session.stepIndex),
+    [route.steps, session.stepIndex]
+  );
+  const cameraLookAheadPoint = useMemo(
+    () =>
+      route.steps[session.stepIndex + 1]?.coordinates ??
+      stepMidpoint(route.steps, session.stepIndex),
+    [route.steps, session.stepIndex]
+  );
 
   return (
     <View style={[styles.root, style]} testID="navigation-view">
@@ -248,21 +328,18 @@ export function NavigationActiveSession({
         defaultEndIcon={defaultEndIcon}
         defaultViaIcon={defaultViaIcon}
         currentStepName={step?.name}
-        currentStepPoint={stepMidpoint(route.steps, session.stepIndex)}
-        cameraLookAheadPoint={
-          route.steps[session.stepIndex + 1]?.coordinates ??
-          stepMidpoint(route.steps, session.stepIndex)
-        }
+        currentStepPoint={currentStepPoint}
+        cameraLookAheadPoint={cameraLookAheadPoint}
         followUser={followUser}
         zoom={followUser ? 16 : initialZoom}
-        onCameraMoveByUser={() => setFollowUser(false)}
+        onCameraMoveByUser={handleBreakFollow}
       />
 
       {followUser ? (
         <FollowBreakSurface
           top={bannerHeight}
           bottom={sheetHeight}
-          onBreakFollow={() => setFollowUser(false)}
+          onBreakFollow={handleBreakFollow}
         />
       ) : null}
 
@@ -299,7 +376,7 @@ export function NavigationActiveSession({
         currentStreet={step?.name}
         bottomOffset={sheetHeight}
         onCompassPress={handleCompass}
-        onToggleMute={() => setMute((m) => !m)}
+        onToggleMute={handleToggleMute}
         onPressMenu={onPressMenu}
       />
 

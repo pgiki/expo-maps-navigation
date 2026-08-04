@@ -1,0 +1,59 @@
+appId: com.example.expomapsnavigation
+---
+# GPS spike must NOT auto-reroute: burn 15s grace with fast corridor travel, brief off, back on.
+# Assert rerouting-status stays not visible (spike < confirm window).
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Live GPS Navigation"
+    timeout: 90000
+- setLocation:
+    latitude: 30.699239
+    longitude: 76.6905161
+- tapOn: "Start Live GPS Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "trip-progress"
+# Burn past REROUTE_STARTUP_GRACE_MS (~16s wall-clock) at driving+ speed (~0.7 km / 0.04 ≈ 17s)
+- travel:
+    points:
+      - "30.699239, 76.6905161"
+      - "30.701982, 76.693183"
+      - "30.704476, 76.690653"
+    speed: 0.04
+- assertNotVisible:
+    id: "rerouting-status"
+# Brief spike ~150m off, then immediately back (< OFF_ROUTE_MIN_DURATION_MS)
+- setLocation:
+    latitude: 30.7005
+    longitude: 76.6885
+- setLocation:
+    latitude: 30.704476
+    longitude: 76.690653
+- takeScreenshot: live-gps-spike-recovered
+# Short on-route hold; chip must not appear
+- assertNotVisible:
+    id: "rerouting-status"
+- travel:
+    points:
+      - "30.704476, 76.690653"
+      - "30.7055, 76.6915"
+    speed: 0.05
+- assertNotVisible:
+    id: "rerouting-status"
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "trip-progress"
+- takeScreenshot: live-gps-spike-no-reroute
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000

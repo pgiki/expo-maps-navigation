@@ -36,13 +36,15 @@ type UseOsrmRouteResult = {
   /** Additional OSRM routes for alternate-path chrome. */
   alternatives: OsrmRoute[];
   selectedRouteIndex: number;
+  /** Increments on intentional route replace (fetch / reroute / cycle). */
+  routeGeneration: number;
   selectRoute: (index: number) => void;
   cycleRoute: () => void;
   /** Re-fetch from a live origin through remaining waypoints to endPoint. */
   rerouteFrom: (
     origin: Coordinate,
     options?: RerouteFromOptions
-  ) => Promise<boolean>;
+  ) => Promise<boolean | 'aborted'>;
   loading: boolean;
   rerouting: boolean;
   error: string | null;
@@ -62,25 +64,44 @@ export function useOsrmRoute({
 }: UseOsrmRouteArgs): UseOsrmRouteResult {
   const [routes, setRoutes] = useState<OsrmRoute[]>([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+  const [routeGeneration, setRouteGeneration] = useState(0);
   const [loading, setLoading] = useState(false);
   const [rerouting, setRerouting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const selectedRouteIndexRef = useRef(0);
   const onErrorRef = useLatestRef(onError);
+  const waypointsRef = useLatestRef(waypoints);
 
-  const router = useMemo(
-    () => routerProp ?? createOsrmRouterAdapter(osrmBaseUrl),
-    [routerProp, osrmBaseUrl]
+  useEffect(() => {
+    selectedRouteIndexRef.current = selectedRouteIndex;
+  }, [selectedRouteIndex]);
+
+  // Prefer host-provided router; otherwise rebuild only when base URL changes.
+  const defaultRouter = useMemo(
+    () => createOsrmRouterAdapter(osrmBaseUrl),
+    [osrmBaseUrl]
   );
+  const router = routerProp ?? defaultRouter;
+  const routerRef = useLatestRef(router);
 
   const waypointsKey = useMemo(
     () =>
       JSON.stringify(
-        waypoints.map((w) => [w.latitude, w.longitude, w.name, w.separatesLegs])
+        waypoints.map((w) => [
+          w.latitude,
+          w.longitude,
+          w.name,
+          w.separatesLegs,
+        ])
       ),
     [waypoints]
   );
+
+  const bumpGeneration = useCallback(() => {
+    setRouteGeneration((g) => g + 1);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -96,7 +117,7 @@ export function useOsrmRoute({
         latitude: startPoint.latitude,
         longitude: startPoint.longitude,
       },
-      ...waypoints.map((w) => ({
+      ...waypointsRef.current.map((w) => ({
         latitude: w.latitude,
         longitude: w.longitude,
       })),
@@ -108,7 +129,7 @@ export function useOsrmRoute({
 
     const profile = travelModeToProfile(travelMode);
 
-    router
+    routerRef.current
       .fetchRoutes({
         coordinates: coords,
         profile,
@@ -125,6 +146,7 @@ export function useOsrmRoute({
           onErrorRef.current?.(message);
         } else {
           setRoutes(result);
+          bumpGeneration();
           setError(null);
         }
       })
@@ -140,6 +162,8 @@ export function useOsrmRoute({
       });
 
     return () => controller.abort();
+    // waypointsKey captures content; avoid unstable waypoints/router array identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     enabled,
     startPoint.latitude,
@@ -148,32 +172,38 @@ export function useOsrmRoute({
     endPoint.longitude,
     travelMode,
     language,
-    router,
+    osrmBaseUrl,
+    routerProp,
     tick,
     waypointsKey,
-    waypoints,
-    onErrorRef,
+    bumpGeneration,
   ]);
 
-  const selectRoute = useCallback((index: number) => {
-    setSelectedRouteIndex((prev) => {
-      if (index < 0 || index >= routes.length) return prev;
-      return index;
-    });
-  }, [routes.length]);
+  const selectRoute = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= routes.length) return;
+      if (index === selectedRouteIndexRef.current) return;
+      selectedRouteIndexRef.current = index;
+      setSelectedRouteIndex(index);
+      bumpGeneration();
+    },
+    [routes.length, bumpGeneration]
+  );
 
   const cycleRoute = useCallback(() => {
-    setSelectedRouteIndex((prev) => {
-      if (routes.length < 2) return 0;
-      return (prev + 1) % routes.length;
-    });
-  }, [routes.length]);
+    if (routes.length < 2) return;
+    const next = (selectedRouteIndexRef.current + 1) % routes.length;
+    if (next === selectedRouteIndexRef.current) return;
+    selectedRouteIndexRef.current = next;
+    setSelectedRouteIndex(next);
+    bumpGeneration();
+  }, [routes.length, bumpGeneration]);
 
   const rerouteFrom = useCallback(
     async (
       origin: Coordinate,
       options?: RerouteFromOptions
-    ): Promise<boolean> => {
+    ): Promise<boolean | 'aborted'> => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -181,8 +211,9 @@ export function useOsrmRoute({
 
       const legIndex = options?.currentLegIndex ?? 0;
       const remainingWaypoints: Coordinate[] = [];
-      for (let i = 0; i < waypoints.length; i++) {
-        const w = waypoints[i]!;
+      const wps = waypointsRef.current;
+      for (let i = 0; i < wps.length; i++) {
+        const w = wps[i]!;
         if (i >= legIndex && w.separatesLegs !== false) {
           remainingWaypoints.push({
             latitude: w.latitude,
@@ -200,25 +231,27 @@ export function useOsrmRoute({
       const profile = travelModeToProfile(travelMode);
 
       try {
-        const result = await router.fetchRoutes({
+        const result = await routerRef.current.fetchRoutes({
           coordinates: coords,
           profile,
           language,
           alternatives: true,
           signal: controller.signal,
         });
-        if (controller.signal.aborted) return false;
+        if (controller.signal.aborted) return 'aborted';
         if (!result.length) {
           const message = 'Unable to recalculate route.';
           onErrorRef.current?.(message);
           return false;
         }
         setRoutes(result);
+        selectedRouteIndexRef.current = 0;
         setSelectedRouteIndex(0);
+        bumpGeneration();
         setError(null);
         return true;
       } catch (e: unknown) {
-        if (controller.signal.aborted) return false;
+        if (controller.signal.aborted) return 'aborted';
         const message = formatOsrmError(e);
         onErrorRef.current?.(message);
         return false;
@@ -226,16 +259,20 @@ export function useOsrmRoute({
         if (!controller.signal.aborted) setRerouting(false);
       }
     },
-    [waypoints, endPoint, travelMode, language, router, onErrorRef]
+    [endPoint.latitude, endPoint.longitude, travelMode, language, bumpGeneration, waypointsRef, routerRef, onErrorRef]
   );
 
   const route = routes[selectedRouteIndex] ?? routes[0] ?? null;
-  const alternatives = routes.filter((_, i) => i !== selectedRouteIndex);
+  const alternatives = useMemo(
+    () => routes.filter((_, i) => i !== selectedRouteIndex),
+    [routes, selectedRouteIndex]
+  );
 
   return {
     route,
     alternatives,
     selectedRouteIndex,
+    routeGeneration,
     selectRoute,
     cycleRoute,
     rerouteFrom,

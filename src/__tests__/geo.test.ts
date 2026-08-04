@@ -42,7 +42,7 @@ describe('courseAlongRouteTurf', () => {
 });
 
 describe('isOffRouteSample', () => {
-  it('flags distances beyond the threshold', () => {
+  it('flags distances beyond the threshold + accuracy slack', () => {
     expect(isOffRouteSample(10, 5)).toBe(false);
     expect(isOffRouteSample(80, 5)).toBe(true);
   });

@@ -22,6 +22,7 @@ export type {
 } from './types';
 
 export type { Language } from './locals';
+export { speechLocale } from './locals';
 
 export {
   DEFAULT_OSRM_BASE_URL,
@@ -60,9 +61,14 @@ export {
   distanceToRouteMeters,
   courseAlongRoute,
   isOffRouteSample,
+  isOffRouteConfirmed,
+  effectiveOffRouteThresholdM,
   OFF_ROUTE_THRESHOLD_M,
   OFF_ROUTE_CONSECUTIVE,
+  OFF_ROUTE_MIN_DURATION_MS,
   REROUTE_COOLDOWN_MS,
+  REROUTE_FAIL_BACKOFF_MS,
+  REROUTE_STARTUP_GRACE_MS,
 } from './osrm/offRoute';
 
 export type { NearestPointResult } from './osrm/offRoute';

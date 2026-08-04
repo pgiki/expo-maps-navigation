@@ -1,0 +1,74 @@
+appId: com.example.expomapsnavigation
+---
+# Sustained off-route after grace → rerouting-status → recover toward corridor.
+# Timing: 15s startup grace; ≥5 off samples and ≥3s continuous off.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Live GPS Navigation"
+    timeout: 90000
+- setLocation:
+    latitude: 30.699239
+    longitude: 76.6905161
+- tapOn: "Start Live GPS Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+# Burn past REROUTE_STARTUP_GRACE_MS (~16s) with fast corridor travel
+- travel:
+    points:
+      - "30.699239, 76.6905161"
+      - "30.701982, 76.693183"
+      - "30.704476, 76.690653"
+    speed: 0.04
+# Sustained off: 5 fixes + short off-corridor travel (≥3.5s)
+- setLocation:
+    latitude: 30.7020
+    longitude: 76.6870
+- setLocation:
+    latitude: 30.70205
+    longitude: 76.68705
+- setLocation:
+    latitude: 30.7021
+    longitude: 76.6871
+- setLocation:
+    latitude: 30.70215
+    longitude: 76.68705
+- setLocation:
+    latitude: 30.7022
+    longitude: 76.6870
+- travel:
+    points:
+      - "30.7020, 76.6870"
+      - "30.7024, 76.6866"
+    speed: 0.015
+- extendedWaitUntil:
+    visible:
+      id: "rerouting-status"
+    timeout: 30000
+- takeScreenshot: live-rerouting-status
+- extendedWaitUntil:
+    notVisible:
+      id: "rerouting-status"
+    timeout: 60000
+# Jump back toward corridor / end
+- setLocation:
+    latitude: 30.704476
+    longitude: 76.690653
+- setLocation:
+    latitude: 30.7075
+    longitude: 76.694
+- assertVisible:
+    id: "navigation-view"
+- assertVisible:
+    id: "maneuver-banner"
+- takeScreenshot: live-reroute-recovered
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000

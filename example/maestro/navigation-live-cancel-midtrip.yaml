@@ -1,0 +1,36 @@
+appId: com.example.expomapsnavigation
+---
+# Live GPS cancel mid-trip: mid progress → cancel → home; navigation-view gone.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Live GPS Navigation"
+    timeout: 90000
+- setLocation:
+    latitude: 30.699239
+    longitude: 76.6905161
+- tapOn: "Start Live GPS Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "trip-progress"
+- setLocation:
+    latitude: 30.701982
+    longitude: 76.693183
+- assertVisible:
+    id: "cancel-navigation"
+- takeScreenshot: live-cancel-midtrip
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000
+- assertVisible:
+    id: "home-screen"
+- assertNotVisible:
+    id: "navigation-view"

@@ -29,6 +29,7 @@ npx expo install lucide-react-native react-native-svg
 npx expo install expo-keep-awake react-native-safe-area-context
 ```
 
+Peers are pinned to **Expo SDK 55** ranges (`expo ^55.0.23`, `expo-maps ~55.0.0`, etc.). **`react-native-svg` is required** by `lucide-react-native` (HUD icons).
 
 > **npm note:** If `npm publish` fails because the name is an unpublished tombstone, reclaim or choose a scoped name (e.g. `@fikachu/expo-maps-navigation`) before the first release.
 
@@ -39,7 +40,9 @@ Configure Android Google Maps API key and the `expo-maps` config plugin per [Exp
 Clone the repo and link the example via `file:..` — see [CONTRIBUTING.md](CONTRIBUTING.md).
 ### Course-up camera (bearing)
 
-`expo-maps` 57 does not apply camera `bearing` in `setCameraPosition` by default. Apply the shipped patch **and** force `expo-maps` to build from source — see **[docs/course-up-patch.md](docs/course-up-patch.md)**. Without it, navigation stays north-up (everything else still works). Upstream tracking: [docs/upstream-bearing.md](docs/upstream-bearing.md).
+> **SDK note:** This branch targets **Expo SDK 55**. The shipped `patches/expo-maps+57.0.1.patch` applies to **expo-maps 57** only. On SDK 55, course-up bearing is **not patched yet** — navigation stays north-up until you port the patch or upgrade to a 57-compatible release. See [docs/course-up-patch.md](docs/course-up-patch.md) and [docs/upstream-bearing.md](docs/upstream-bearing.md).
+
+On SDK 57 hosts, `expo-maps` does not apply camera `bearing` in `setCameraPosition` by default. Apply the shipped patch **and** force `expo-maps` to build from source — see **[docs/course-up-patch.md](docs/course-up-patch.md)**.
 
 While navigating, the **location puck** updates on every GPS sample; the **following camera** only animates when a frame gate passes (enough movement or heading change, min interval, not idle). Bearing can soften toward the next maneuver (look-ahead, clamped ±45°). On iOS, camera updates are discrete jumps (expo-maps has no `duration`); Android uses a non-overlapping animation duration aligned with the follow interval.
 
@@ -47,11 +50,20 @@ Panning the map enters **free mode** (follow stops; a recenter control appears).
 
 ```sh
 npm i -D patch-package
-# copy patches/expo-maps+57.0.1.patch into your app's patches/
+# SDK 57 only — copy patches/expo-maps+57.0.1.patch into your app's patches/
 # add "postinstall": "patch-package"
 # add expo.autolinking.buildFromSource: ["expo-maps"] (SDK 57 XCFramework ignores Swift patches)
 npx expo prebuild && cd ios && pod install && cd .. && npx expo run:ios
 ```
+
+### Host integration tips (stability)
+
+To avoid accidental route refetches and UI thrash during live GPS:
+
+- **Memoize** `startPoint`, `endPoint`, `waypoints`, and `router` (e.g. `useMemo`) so identity stays stable across parent re-renders.
+- Prefer not calling `setState` on every `onLocationChange` unless derived props remain referentially stable.
+- Use `bottomOffset` when a custom `BottomSheet` is taller/shorter than the built-in trip progress bar so HUD chrome clears it.
+- Auto-reroute requires **5 consecutive** off-route samples **and** ≥**3s** continuous off-route; failed recalculations back off for **15s**.
 
 ## Usage
 
