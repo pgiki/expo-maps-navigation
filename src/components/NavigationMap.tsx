@@ -202,6 +202,8 @@ function buildAppleAnnotations(input: {
     destTitle,
   } = input;
 
+  const centerAnchor = { x: 0.5, y: 0.5 };
+
   const annotations: Record<string, unknown>[] = [
     {
       id: 'start',
@@ -210,6 +212,7 @@ function buildAppleAnnotations(input: {
         longitude: startPoint.longitude,
       },
       title: originTitle,
+      anchor: centerAnchor,
       ...(originIcon
         ? { icon: originIcon }
         : {
@@ -223,6 +226,7 @@ function buildAppleAnnotations(input: {
         id: `wp-${i}`,
         coordinates: { latitude: w.latitude, longitude: w.longitude },
         title: pointLabel(w, `Waypoint ${i + 1}`),
+        anchor: centerAnchor,
         ...(icon
           ? { icon }
           : {
@@ -238,6 +242,7 @@ function buildAppleAnnotations(input: {
         longitude: endPoint.longitude,
       },
       title: destTitle,
+      anchor: centerAnchor,
       ...(destIcon
         ? { icon: destIcon }
         : {
@@ -308,6 +313,8 @@ function buildGoogleMarkers(input: {
     destTitle,
   } = input;
 
+  const centerAnchor = { x: 0.5, y: 0.5 };
+
   return [
     {
       id: 'start',
@@ -316,6 +323,7 @@ function buildGoogleMarkers(input: {
         longitude: startPoint.longitude,
       },
       title: originTitle,
+      anchor: centerAnchor,
       ...(originIcon ? { icon: originIcon } : {}),
     },
     ...waypoints.map((w, i) => {
@@ -324,6 +332,7 @@ function buildGoogleMarkers(input: {
         id: `wp-${i}`,
         coordinates: { latitude: w.latitude, longitude: w.longitude },
         title: pointLabel(w, `Waypoint ${i + 1}`),
+        anchor: centerAnchor,
         ...(icon ? { icon } : {}),
       };
     }),
@@ -334,6 +343,7 @@ function buildGoogleMarkers(input: {
         longitude: endPoint.longitude,
       },
       title: destTitle,
+      anchor: centerAnchor,
       ...(destIcon ? { icon: destIcon } : {}),
     },
     ...(streetLabel
@@ -353,7 +363,7 @@ function buildGoogleMarkers(input: {
               latitude: location.latitude,
               longitude: location.longitude,
             },
-            anchor: { x: 0.5, y: 0.5 },
+            anchor: centerAnchor,
             ...(userIcon ? { icon: userIcon } : {}),
           },
         ]
