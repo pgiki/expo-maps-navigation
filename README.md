@@ -29,7 +29,6 @@ npx expo install lucide-react-native react-native-svg
 npx expo install expo-keep-awake react-native-safe-area-context
 ```
 
-Peers are pinned to **Expo SDK 57** ranges (`expo-maps ~57.0.1`, etc.). **`react-native-svg` is required** by `lucide-react-native` (HUD icons).
 
 > **npm note:** If `npm publish` fails because the name is an unpublished tombstone, reclaim or choose a scoped name (e.g. `@fikachu/expo-maps-navigation`) before the first release.
 
