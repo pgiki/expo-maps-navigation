@@ -75,6 +75,11 @@ export type NavigationActiveSessionProps = {
   defaultViaIcon?: MapMarkerImage;
   topInset: number;
   bottomInset: number;
+  /**
+   * Override HUD / chrome clearance above the bottom sheet.
+   * When omitted, derived from sheet visibility + safe-area inset.
+   */
+  bottomOffset?: number;
   BottomSheet: ComponentType<BottomSheetProps>;
   cycleRoute: () => void;
   rerouteFrom: (
@@ -117,6 +122,7 @@ export function NavigationActiveSession({
   defaultViaIcon,
   topInset,
   bottomInset,
+  bottomOffset: bottomOffsetProp,
   BottomSheet,
   cycleRoute,
   rerouteFrom,
@@ -222,9 +228,9 @@ export function NavigationActiveSession({
     } satisfies RouteProgress);
 
   const bannerHeight = topInset + 72;
-  const sheetHeight = features.statusHidden
-    ? 24
-    : Math.max(120, bottomInset + 100);
+  const sheetHeight =
+    bottomOffsetProp ??
+    (features.statusHidden ? 24 : Math.max(120, bottomInset + 100));
   const altPolylines = alternatives.map((a) => a.polyline);
 
   return (

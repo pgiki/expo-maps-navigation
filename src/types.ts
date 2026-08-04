@@ -253,6 +253,15 @@ export interface MapNavigationProps {
    */
   BottomSheet?: ComponentType<BottomSheetProps>;
 
+  /**
+   * Vertical space (px) reserved above the bottom edge for HUD chrome
+   * (mute / compass / speed / street / menu). Defaults to the estimated
+   * trip-sheet height (`max(120, bottomInset + 100)`, or `24` when
+   * `hideStatusView` is true). Pass an explicit value when using a custom
+   * `BottomSheet` with a different height.
+   */
+  bottomOffset?: number;
+
   onLocationChange?: (location: Location) => void;
   onRouteProgressChange?: (progress: RouteProgress) => void;
   onError?: (error: MapNavigationEvent) => void;

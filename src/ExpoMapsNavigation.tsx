@@ -111,6 +111,7 @@ export default function ExpoMapsNavigation(props: MapNavigationProps) {
     onRerouteFailed,
     onPressMenu,
     BottomSheet = TripProgressBar,
+    bottomOffset,
   } = props;
 
   const insets = useNavInsets();
@@ -348,6 +349,7 @@ export default function ExpoMapsNavigation(props: MapNavigationProps) {
       defaultViaIcon={defaultViaPin ?? undefined}
       topInset={insets.top}
       bottomInset={insets.bottom}
+      bottomOffset={bottomOffset}
       BottomSheet={BottomSheet}
       cycleRoute={cycleRoute}
       rerouteFrom={rerouteFrom}

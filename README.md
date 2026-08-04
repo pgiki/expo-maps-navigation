@@ -188,6 +188,7 @@ Also exported: `BottomSheetProps` (contract for custom sheets), `RouterAdapter`,
 | `startPoint` / `endPoint` / `waypoints` | Required start & end; optional vias. Marker props: `name` (prefer over `title`), `icon`/`image`, iOS `systemImage`, `tintColor`. When `icon` is omitted, packaged geometric defaults are used (circle start, square end, smaller circle via), center-anchored. |
 | `userMarker` | Live puck style (`icon` SharedRef or iOS `systemImage`) |
 | `BottomSheet` | `ComponentType<BottomSheetProps>` replacing the built-in trip progress bar. See [Custom bottom sheet](#custom-bottom-sheet). |
+| `bottomOffset` | HUD chrome clearance above the bottom edge (px). Defaults to estimated trip-sheet height; set explicitly for a taller/shorter custom `BottomSheet`. |
 | `osrmBaseUrl` | OSRM base URL. **Do not ship the public demo for production.** |
 | `requireOsrmBaseUrl` | When true, errors if still on the public demo host (unless `router` is set) |
 | `router` | Pluggable `RouterAdapter` (replaces default OSRM HTTP client) |
