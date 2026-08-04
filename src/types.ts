@@ -92,18 +92,41 @@ export type MapNavigationEvent = {
   message?: string;
 };
 
-/** Props passed to a custom {@link MapNavigationProps.BottomSheet} component. */
+/**
+ * Props passed to a custom {@link MapNavigationProps.BottomSheet} component.
+ *
+ * `ExpoMapsNavigation` injects: `durationRemaining`, `distanceRemaining`,
+ * `distanceUnit`, `language`, `showCancelButton`, `showAltRoutesButton`,
+ * `bottomInset`, `onCancel`, and `onCycleRoutes`.
+ *
+ * `onSearchPress` is part of this shape for custom UIs that mirror the built-in
+ * trip progress bar API; it is **not** injected by the host today — implement
+ * search inside your sheet if needed.
+ */
 export type BottomSheetProps = {
+  /** Seconds remaining on the active route. */
   durationRemaining: number;
+  /** Metres remaining on the active route. */
   distanceRemaining: number;
   distanceUnit?: 'metric' | 'imperial';
   language?: Language;
+  /** Whether the sheet should offer a cancel control. */
   showCancelButton?: boolean;
-  /** Show alt-route cycle control when multiple routes exist. */
+  /**
+   * When true, show an alt-route cycle control (OSRM returned alternatives).
+   * Wire to {@link BottomSheetProps.onCycleRoutes}.
+   */
   showAltRoutesButton?: boolean;
+  /** Safe-area bottom inset for padding the sheet. */
   bottomInset?: number;
+  /**
+   * Optional search handler (built-in bar shows an unavailable alert if unset).
+   * Not currently passed by `ExpoMapsNavigation`.
+   */
   onSearchPress?: () => void;
+  /** Stops navigation (GPS / sim / TTS) and fires `onCancelNavigation`. */
   onCancel?: () => void;
+  /** Cycle to the next alternate route when alternatives exist. */
   onCycleRoutes?: () => void;
 };
 
@@ -120,14 +143,27 @@ export type NativeEventsProps = {
 };
 
 export interface MapNavigationProps {
+  /** Flex container for the full-screen map and navigation chrome. */
   style?: StyleProp<ViewStyle>;
+  /** Silences turn-by-turn TTS when true. */
   mute?: boolean;
+  /**
+   * Show a cancel control on the bottom sheet (or a floating cancel when
+   * `hideStatusView` is also true).
+   */
   showCancelButton?: boolean;
-  /** Trip start — same marker props as waypoints (`name`, `icon`, `systemImage`, …). */
+  /**
+   * Trip start. Marker props: `name`, `icon`/`image`, iOS `systemImage`, `tintColor`.
+   * When `icon` is omitted, a packaged geometric start marker (circle) is used.
+   */
   startPoint: RoutePoint;
   waypoints?: Waypoint[];
-  /** Trip end — same marker props as waypoints (`name`/`title`, `icon`, `systemImage`, …). */
+  /**
+   * Trip end. Same marker surface as waypoints (`name`/`title`, `icon`, …).
+   * Default packaged marker is a geometric square when `icon` is omitted.
+   */
   endPoint: RoutePoint;
+  /** Chrome + maneuver TTS locale (see `Language`). */
   language?: Language;
   distanceUnit?: 'metric' | 'imperial';
 
@@ -157,7 +193,8 @@ export interface MapNavigationProps {
   showsEndOfRouteFeedback?: boolean;
 
   /**
-   * Hide the bottom trip progress / status bar.
+   * Hide the bottom trip progress / status bar (custom or built-in).
+   * With `showCancelButton`, cancel becomes a floating control instead.
    * @Default false
    */
   hideStatusView?: boolean;
@@ -210,8 +247,9 @@ export interface MapNavigationProps {
   enableBackgroundLocation?: boolean;
 
   /**
-   * Custom bottom status sheet. Receives remaining time/distance and cancel /
-   * alt-route actions. Defaults to the built-in trip progress bar.
+   * Custom bottom status sheet (`ComponentType<BottomSheetProps>`).
+   * Defaults to the built-in trip progress bar. Hide entirely with
+   * `hideStatusView`. See {@link BottomSheetProps} for injected fields.
    */
   BottomSheet?: ComponentType<BottomSheetProps>;
 
@@ -227,6 +265,9 @@ export interface MapNavigationProps {
   onReroute?: (info: { location: Location }) => void;
   /** Fired when an automatic reroute request fails. */
   onRerouteFailed?: (info: { message: string }) => void;
-  /** Fired when the menu button is pressed. */
+  /**
+   * When set, shows a menu FAB in the right HUD stack (`testID="menu-button"`).
+   * Omit to hide the control. Use for a host drawer / trip options sheet.
+   */
   onPressMenu?: () => void;
 }

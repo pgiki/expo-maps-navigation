@@ -11,10 +11,12 @@ Turn-by-turn navigation for Expo apps using **expo-maps** and **OSRM**.
 - `ExpoMapsNavigation` component with turn-by-turn props and events
 - OSRM routing via `osrmBaseUrl` (or pluggable `RouterAdapter`)
 - Turn-by-turn banner, trip progress, mute, cancel (tears down GPS / sim / TTS)
+- Customizable bottom status sheet (`BottomSheet`) — defaults to built-in trip progress
+- Optional HUD menu button (`onPressMenu`)
 - Voice guidance via `expo-speech`
 - Route simulation (`shouldSimulateRoute`, `simulationSpeedMultiplier`)
 - Off-route detection + auto-reroute (`rerouteEnabled`, `onOffRoute` / `onReroute`)
-- Multi-waypoint support + alternate route polylines
+- Multi-waypoint support + alternate route polylines (cycle via the bottom sheet when alternatives exist)
 - Apple Maps (iOS) / Google Maps (Android) via `expo-maps`
 - Optional background location (`enableBackgroundLocation` — see [docs/background-location.md](docs/background-location.md))
 
@@ -83,6 +85,9 @@ export default function App() {
       language="en"
       distanceUnit="metric"
       onCancelNavigation={() => {}}
+      onPressMenu={() => {
+        /* open host drawer / trip options */
+      }}
       onArrive={(point) => console.log('arrived', point)}
       onRouteProgressChange={(p) => console.log(p)}
       onOffRoute={(loc) => console.log('off route', loc)}
@@ -113,18 +118,77 @@ const router: RouterAdapter = createOsrmRouterAdapter(
 <ExpoMapsNavigation router={router} /* ... */ />;
 ```
 
+### Custom bottom sheet
+
+Pass a `BottomSheet` component to replace the built-in trip progress bar. It must accept [`BottomSheetProps`](src/types.ts). The library injects remaining time/distance, cancel, and alt-route cycling; hide the sheet entirely with `hideStatusView`.
+
+```tsx
+import { Pressable, Text, View } from 'react-native';
+import ExpoMapsNavigation, {
+  type BottomSheetProps,
+} from 'expo-maps-navigation';
+
+function MyTripSheet({
+  durationRemaining,
+  distanceRemaining,
+  showCancelButton,
+  showAltRoutesButton,
+  bottomInset = 0,
+  onCancel,
+  onCycleRoutes,
+}: BottomSheetProps) {
+  return (
+    <View style={{ paddingBottom: bottomInset, padding: 16 }}>
+      <Text>
+        {Math.round(durationRemaining / 60)} min ·{' '}
+        {Math.round(distanceRemaining)} m
+      </Text>
+      {showAltRoutesButton ? (
+        <Pressable onPress={onCycleRoutes}>
+          <Text>Next route</Text>
+        </Pressable>
+      ) : null}
+      {showCancelButton ? (
+        <Pressable onPress={onCancel}>
+          <Text>Cancel</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+<ExpoMapsNavigation
+  BottomSheet={MyTripSheet}
+  onPressMenu={() => {
+    /* open host drawer */
+  }}
+  showCancelButton
+  /* ... */
+/>;
+```
+
+**`BottomSheetProps` (injected):** `durationRemaining`, `distanceRemaining`, `distanceUnit`, `language`, `showCancelButton`, `showAltRoutesButton`, `bottomInset`, `onCancel`, `onCycleRoutes`.
+
+`onSearchPress` exists on the type for sheets that mirror the built-in bar’s search control; it is **not** passed by `ExpoMapsNavigation` — implement search inside your sheet if needed.
+
+### HUD menu
+
+When `onPressMenu` is set, a menu FAB appears in the right HUD stack (`testID="menu-button"`). Omit the prop to hide it. Use it for a host drawer or trip options sheet.
+
 ## API
 
 Primary export: **`ExpoMapsNavigation`**. Alias: `MapNavigation` (same component).
 
-Also exported: types such as `BottomSheetProps`, `RouterAdapter`, helpers like `createOsrmRouterAdapter`.
+Also exported: `BottomSheetProps` (contract for custom sheets), `RouterAdapter`, helpers like `createOsrmRouterAdapter`.
 
 ## Props
 
 | Prop | Notes |
 | --- | --- |
-| `startPoint` / `endPoint` / `waypoints` | Required start & end; optional vias. Marker props: `name` (prefer over `title`), `icon`/`image`, iOS `systemImage`, `tintColor`. Android gets packaged default pin PNGs when `icon` is omitted. |
+| `style` | Flex container for the full-screen map and navigation chrome |
+| `startPoint` / `endPoint` / `waypoints` | Required start & end; optional vias. Marker props: `name` (prefer over `title`), `icon`/`image`, iOS `systemImage`, `tintColor`. When `icon` is omitted, packaged geometric defaults are used (circle start, square end, smaller circle via), center-anchored. |
 | `userMarker` | Live puck style (`icon` SharedRef or iOS `systemImage`) |
+| `BottomSheet` | `ComponentType<BottomSheetProps>` replacing the built-in trip progress bar. See [Custom bottom sheet](#custom-bottom-sheet). |
 | `osrmBaseUrl` | OSRM base URL. **Do not ship the public demo for production.** |
 | `requireOsrmBaseUrl` | When true, errors if still on the public demo host (unless `router` is set) |
 | `router` | Pluggable `RouterAdapter` (replaces default OSRM HTTP client) |
@@ -134,16 +198,17 @@ Also exported: types such as `BottomSheetProps`, `RouterAdapter`, helpers like `
 | `rerouteEnabled` | Auto-reroute on live GPS off-route (`true` by default; off during sim) |
 | `enableBackgroundLocation` | Opt-in background updates — see docs |
 | `mute` | Silences TTS |
-| `showCancelButton` | Cancel control (stops GPS/sim/TTS, then `onCancelNavigation`) |
+| `showCancelButton` | Cancel control (stops GPS/sim/TTS, then `onCancelNavigation`). With `hideStatusView`, becomes a floating button. |
 | `distanceUnit` | `metric` \| `imperial` |
-| `language` | Chrome + maneuver TTS locale packs |
+| `language` | Chrome + maneuver TTS locale packs (`Language`) |
 | `showsEndOfRouteFeedback` | Arrived overlay |
-| `hideStatusView` | Hides bottom progress card |
+| `hideStatusView` | Hides bottom progress card (custom or built-in) |
 | `onLocationChange` | `{ latitude, longitude, heading, accuracy, speed? }` |
 | `onRouteProgressChange` | Along-route distance / duration / fraction |
 | `onArrive` | Destination and separating waypoints — Turf along-route remaining + proximity + consecutive GPS samples (sim confirms at polyline end) |
 | `onOffRoute` / `onReroute` / `onRerouteFailed` | Corridor leave + recalculation |
 | `onCancelNavigation` / `onError` | User cancel / failures (`OsrmError` detail in message) |
+| `onPressMenu` | Optional. When set, shows the HUD menu FAB; omit to hide. |
 
 ## Example & Maestro E2E
 
