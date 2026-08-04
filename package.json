@@ -96,7 +96,7 @@
     "lucide-react-native": "^1.28.0",
     "react": "19.2.3",
     "react-native": "0.86.2",
-    "react-native-builder-bob": "^0.40.0",
+    "react-native-builder-bob": "^0.43.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
     "typescript": "~6.0.3",
