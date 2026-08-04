@@ -98,7 +98,7 @@
     "react-native": "0.86.2",
     "react-native-builder-bob": "^0.40.0",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-svg": "15.15.4",
+    "react-native-svg": "15.15.5",
     "typescript": "~6.0.3",
     "vitest": "^3.2.7"
   },
