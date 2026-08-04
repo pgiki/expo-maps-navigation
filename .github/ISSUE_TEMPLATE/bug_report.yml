@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a bug in expo-maps-navigation
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. For security issues, use [SECURITY.md](../../SECURITY.md) instead.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps or a small Expo snippet
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "expo-maps-navigation, Expo SDK, expo-maps, iOS/Android"
+      placeholder: "0.1.0 / SDK 57 / expo-maps 57.0.1 / iOS 18"
+    validations:
+      required: true
+  - type: checkboxes
+    id: course-up
+    attributes:
+      label: Course-up patch
+      options:
+        - label: Applied patches/expo-maps+57.0.1.patch + buildFromSource (if camera bearing related)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: onError messages, Metro logs, Maestro failure snippet

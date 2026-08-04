@@ -1,0 +1,16 @@
+node_modules/
+lib/
+.expo/
+dist/
+*.log
+.DS_Store
+example/ios/
+example/android/
+example/.expo/
+example/maestro/.maestro/
+example/node_modules/
+*.tsbuildinfo
+*.png.orig
+.idea/
+.vscode/
+*.swp

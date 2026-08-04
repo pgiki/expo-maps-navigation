@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Expo Maps Navigation",
+    "slug": "expo-maps-navigation-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.expomapsnavigation",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to use your location for turn-by-turn navigation."
+      }
+    },
+    "android": {
+      "package": "com.example.expomapsnavigation",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Allow $(PRODUCT_NAME) to use your location for navigation"
+        }
+      ],
+      "expo-location",
+      "expo-image",
+      "expo-status-bar"
+    ]
+  }
+}

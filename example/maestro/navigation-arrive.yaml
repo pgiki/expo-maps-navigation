@@ -1,0 +1,27 @@
+appId: com.example.expomapsnavigation
+---
+# Do not clearState — that wipes jsLocation and reconnects to the wrong Metro.
+# Fast sim + Turf arrive confirmation → end-of-route overlay.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Fast Simulation"
+    timeout: 90000
+- tapOn: "Start Fast Simulation"
+- extendedWaitUntil:
+    visible:
+      id: "maneuver-banner"
+    timeout: 60000
+- assertVisible:
+    id: "trip-progress"
+- extendedWaitUntil:
+    visible:
+      id: "end-of-route"
+    timeout: 180000
+- assertVisible: "You have arrived"
+- takeScreenshot: arrive-confirmed
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000

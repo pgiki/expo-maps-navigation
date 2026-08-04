@@ -1,0 +1,47 @@
+{
+  "name": "expo-maps-navigation-example",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "prebuild": "expo prebuild",
+    "postinstall": "patch-package",
+    "maestro": "maestro test maestro/",
+    "maestro:ios": "METRO_PORT=8084 ./scripts/maestro-ios.sh"
+  },
+  "expo": {
+    "autolinking": {
+      "buildFromSource": [
+        "expo-maps"
+      ]
+    }
+  },
+  "dependencies": {
+    "@turf/bearing": "^7.4.0",
+    "@turf/distance": "^7.4.0",
+    "@turf/helpers": "^7.4.0",
+    "@turf/nearest-point-on-line": "^7.4.0",
+    "expo": "^57.0.0",
+    "expo-image": "~57.0.2",
+    "expo-keep-awake": "~57.0.1",
+    "expo-location": "~57.0.7",
+    "expo-maps": "~57.0.1",
+    "expo-maps-navigation": "file:..",
+    "expo-speech": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "lucide-react-native": "^1.28.0",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.4",
+    "patch-package": "^8.0.1",
+    "typescript": "~6.0.3"
+  }
+}

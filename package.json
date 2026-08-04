@@ -1,0 +1,135 @@
+{
+  "name": "expo-maps-navigation",
+  "version": "0.1.0",
+  "description": "Turn-by-turn navigation for Expo using expo-maps and OSRM.",
+  "source": "./src/index.tsx",
+  "main": "./lib/commonjs/index.js",
+  "module": "./lib/module/index.js",
+  "types": "./lib/typescript/commonjs/src/index.d.ts",
+  "react-native": "./src/index.tsx",
+  "exports": {
+    ".": {
+      "react-native": "./src/index.tsx",
+      "import": {
+        "types": "./lib/typescript/module/src/index.d.ts",
+        "default": "./lib/module/index.js"
+      },
+      "require": {
+        "types": "./lib/typescript/commonjs/src/index.d.ts",
+        "default": "./lib/commonjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "src",
+    "lib",
+    "patches",
+    "docs",
+    "CHANGELOG.md",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "del-cli lib",
+    "prepare": "bob build",
+    "prepublishOnly": "bob build",
+    "build": "bob build"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "expo-maps",
+    "navigation",
+    "osrm",
+    "turn-by-turn",
+    "ios",
+    "android"
+  ],
+  "license": "MIT",
+  "author": "expo-maps-navigation contributors",
+  "engines": {
+    "node": ">=20"
+  },
+  "homepage": "https://github.com/fikachu/expo-maps-navigation#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fikachu/expo-maps-navigation.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fikachu/expo-maps-navigation/issues"
+  },
+  "peerDependencies": {
+    "expo": "~57.0.0",
+    "expo-image": "~57.0.0",
+    "expo-keep-awake": "~57.0.0",
+    "expo-location": "~57.0.0",
+    "expo-maps": "~57.0.1",
+    "expo-speech": "~57.0.0",
+    "lucide-react-native": ">=0.400.0",
+    "react": "*",
+    "react-native": "*",
+    "react-native-safe-area-context": ">=4.0.0",
+    "react-native-svg": ">=15.0.0"
+  },
+  "peerDependenciesMeta": {
+    "expo-keep-awake": {
+      "optional": true
+    },
+    "react-native-safe-area-context": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.4",
+    "del-cli": "^5.1.0",
+    "expo": "^57.0.10",
+    "expo-image": "~57.0.2",
+    "expo-keep-awake": "~57.0.1",
+    "expo-location": "~57.0.7",
+    "expo-maps": "~57.0.1",
+    "expo-speech": "~57.0.1",
+    "lucide-react-native": "^1.28.0",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-builder-bob": "^0.40.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.7"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      [
+        "commonjs",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "module",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "dependencies": {
+    "@turf/bearing": "^7.4.0",
+    "@turf/distance": "^7.4.0",
+    "@turf/helpers": "^7.4.0",
+    "@turf/nearest-point-on-line": "^7.4.0"
+  }
+}

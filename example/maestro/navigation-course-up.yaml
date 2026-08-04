@@ -1,0 +1,38 @@
+appId: com.example.expomapsnavigation
+---
+# Course-up visual proof: settled bearing vs north-up (compass).
+# Requires expo-maps patch + buildFromSource (see docs/course-up-patch.md).
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 90000
+- tapOn: "Start Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "maneuver-banner"
+    timeout: 60000
+- assertVisible:
+    id: "trip-progress"
+- assertVisible:
+    id: "compass-button"
+- assertVisible:
+    id: "speed-badge"
+# Let the sim advance so course-up bearing and snap settle
+- extendedWaitUntil:
+    visible:
+      id: "maneuver-distance"
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: course-up-settled
+# Reset to north-up via compass — map orientation should change vs settled
+- tapOn:
+    id: "compass-button"
+- waitForAnimationToEnd
+- takeScreenshot: course-up-after-compass-north
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000

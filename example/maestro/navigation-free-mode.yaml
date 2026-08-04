@@ -1,0 +1,76 @@
+appId: com.example.expomapsnavigation
+---
+# Free mode: drag leaves follow-my-location; recenter resumes following.
+# Uses map-follow-surface (drag-to-break-follow) + recenter FAB assertions.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 90000
+- tapOn: "Start Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "trip-progress"
+- assertVisible:
+    id: "compass-button"
+- assertVisible:
+    id: "map-follow-surface"
+# Following: recenter control must stay hidden
+- assertNotVisible:
+    id: "recenter-button"
+- waitForAnimationToEnd
+# Drag across the follow-break surface (map body; avoid banner / sheet)
+- swipe:
+    from:
+      id: "map-follow-surface"
+    start: 80%, 45%
+    end: 20%, 50%
+    duration: 600
+- waitForAnimationToEnd
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: "recenter-button"
+          commands:
+            - swipe:
+                start: 22%, 40%
+                end: 78%, 46%
+                duration: 650
+            - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "recenter-button"
+    timeout: 15000
+# Follow surface unmounts in free mode so the map can pan freely
+- assertNotVisible:
+    id: "map-follow-surface"
+- takeScreenshot: free-mode-after-pan
+# Recenter resumes follow-my-location
+- tapOn:
+    id: "recenter-button"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    notVisible:
+      id: "recenter-button"
+    timeout: 10000
+- assertVisible:
+    id: "map-follow-surface"
+- assertVisible:
+    id: "navigation-view"
+- assertVisible:
+    id: "maneuver-banner"
+- takeScreenshot: follow-resumed-after-recenter
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000

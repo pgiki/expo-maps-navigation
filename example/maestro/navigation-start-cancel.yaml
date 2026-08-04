@@ -1,0 +1,31 @@
+appId: com.example.expomapsnavigation
+---
+# Cancel tears down the session (host returns home; navigation-view gone).
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 90000
+- assertVisible: "Expo Maps Navigation"
+- assertVisible: "Start Navigation"
+- tapOn: "Start Navigation"
+- extendedWaitUntil:
+    visible:
+      id: "navigation-view"
+    timeout: 60000
+- assertVisible:
+    id: "maneuver-banner"
+- assertVisible:
+    id: "cancel-navigation"
+- tapOn:
+    id: "mute-button"
+- tapOn:
+    id: "cancel-navigation"
+- extendedWaitUntil:
+    visible: "Start Navigation"
+    timeout: 30000
+- assertVisible:
+    id: "home-screen"
+- assertNotVisible:
+    id: "navigation-view"

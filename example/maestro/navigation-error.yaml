@@ -1,0 +1,16 @@
+appId: com.example.expomapsnavigation
+---
+# Forced OSRM/network failure surfaces nav-error + onError.
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Force Route Error"
+    timeout: 90000
+- tapOn: "Force Route Error"
+- extendedWaitUntil:
+    visible:
+      id: "nav-error"
+    timeout: 60000
+- assertVisible:
+    id: "nav-status"
