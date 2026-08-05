@@ -37,6 +37,7 @@ import { EndOfRouteFeedback } from './EndOfRouteFeedback';
 import { FollowBreakSurface } from './FollowBreakSurface';
 import { NavIcon } from './NavIcon';
 import { zoomForSpanMeters, distanceMeters } from '../osrm/progress';
+import { FOLLOW_ZOOM } from '../geo/navigationCamera';
 import type { LatLng } from '../osrm/instructions';
 import { navChrome } from '../theme/navChrome';
 import { elevatedShadow } from '../theme/shadows';
@@ -263,7 +264,7 @@ export function NavigationActiveSession({
     if (loc) {
       mapRef.current?.setCameraPosition({
         coordinates: loc,
-        zoom: 16,
+        zoom: FOLLOW_ZOOM,
         bearing: 0,
       });
     }
@@ -275,7 +276,7 @@ export function NavigationActiveSession({
     if (loc) {
       mapRef.current?.setCameraPosition({
         coordinates: loc,
-        zoom: 16,
+        zoom: FOLLOW_ZOOM,
         bearing: loc.heading,
       });
     }
@@ -331,7 +332,7 @@ export function NavigationActiveSession({
         currentStepPoint={currentStepPoint}
         cameraLookAheadPoint={cameraLookAheadPoint}
         followUser={followUser}
-        zoom={followUser ? 16 : initialZoom}
+        zoom={followUser ? FOLLOW_ZOOM : initialZoom}
         onCameraMoveByUser={handleBreakFollow}
       />
 

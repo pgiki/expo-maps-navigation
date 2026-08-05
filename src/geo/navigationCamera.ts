@@ -4,6 +4,9 @@ import { bearingDegrees, distanceMeters } from '../osrm/progress';
 /** Min ground movement before a following camera frame (metres). */
 export const FOLLOW_MIN_MOVE_M = 12;
 
+/** Map zoom while following / after recenter (slightly close for road + turns). */
+export const FOLLOW_ZOOM = 17;
+
 /** Min heading change before a following camera frame (degrees). */
 export const FOLLOW_MIN_BEARING_DEG = 15;
 

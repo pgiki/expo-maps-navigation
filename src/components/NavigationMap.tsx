@@ -22,6 +22,7 @@ import { distanceMeters } from '../osrm/progress';
 import {
   bearingDeltaDeg,
   computeLookAheadBearing,
+  FOLLOW_ZOOM,
   followAndroidDurationMs,
   programmaticMoveGuardMs,
   shouldUpdateFollowingCamera,
@@ -495,7 +496,7 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
       defaultEndIcon,
       defaultViaIcon,
       followUser = true,
-      zoom = 16,
+      zoom = FOLLOW_ZOOM,
       onCameraMoveByUser,
     },
     ref

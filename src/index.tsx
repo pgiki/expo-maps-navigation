@@ -56,6 +56,8 @@ export {
   computeRemaining,
 } from './osrm/progress';
 
+export { FOLLOW_ZOOM } from './geo/navigationCamera';
+
 export {
   nearestPointOnPolyline,
   distanceToRouteMeters,
