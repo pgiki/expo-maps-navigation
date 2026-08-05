@@ -13,7 +13,6 @@ type Props = {
   distanceUnit?: 'metric' | 'imperial';
   /** Ground speed in m/s. */
   speedMps?: number | null;
-  currentStreet?: string;
   /** Space reserved for the bottom trip sheet. */
   bottomOffset?: number;
   onCompassPress?: () => void;
@@ -26,14 +25,12 @@ export function MapHud({
   language = 'en',
   distanceUnit = 'metric',
   speedMps,
-  currentStreet,
   bottomOffset = 120,
   onCompassPress,
   onToggleMute,
   onPressMenu,
 }: Props) {
   const speedLabel = formatSpeed(speedMps, distanceUnit);
-  const street = currentStreet?.trim();
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -83,18 +80,6 @@ export function MapHud({
         </Text>
         <Text style={styles.speedUnit}>{speedLabel.unit}</Text>
       </View>
-
-      {street ? (
-        <View
-          style={[styles.streetChip, { bottom: bottomOffset + 8 }]}
-          testID="current-street-chip"
-          pointerEvents="none"
-        >
-          <Text style={styles.streetChipText} numberOfLines={1}>
-            {street}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -155,23 +140,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     marginTop: -1,
-  },
-  streetChip: {
-    position: 'absolute',
-    alignSelf: 'center',
-    left: 88,
-    right: 72,
-    backgroundColor: navChrome.colors.sheetBg,
-    borderRadius: navChrome.radius.chip,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    zIndex: 12,
-    ...elevatedShadow(2, 8, 0.16, 4),
-  },
-  streetChipText: {
-    color: navChrome.colors.sheetFg,
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

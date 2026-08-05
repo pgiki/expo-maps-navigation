@@ -160,7 +160,7 @@ export function NavigationActiveSession({
   const onRerouteFailedRef = useLatestRef(onRerouteFailed);
   const rerouteFromRef = useLatestRef(rerouteFrom);
   const languageRef = useLatestRef(language);
-  const notifyRerouteSettledRef = useRef<(ok: boolean) => void>(() => {});
+  const notifyRerouteSettledRef = useRef<(ok: boolean) => void>(() => { });
 
   const handleOffRoute = useCallback(
     (loc: NavLocation) => {
@@ -374,7 +374,6 @@ export function NavigationActiveSession({
         language={language}
         distanceUnit={distanceUnit}
         speedMps={session.location?.speed}
-        currentStreet={step?.name}
         bottomOffset={sheetHeight}
         onCompassPress={handleCompass}
         onToggleMute={handleToggleMute}
