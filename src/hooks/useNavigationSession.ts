@@ -33,7 +33,7 @@ import { NavigationSmoother } from '../geo/smoothNavigation';
 import { resolveHeading } from '../geo/heading';
 import {
   ARRIVE_ALONG_REMAINING_M,
-  arriveStreakRequired,
+  arriveStreakForSample,
   evaluateArriveSample,
 } from '../geo/arriveConfirmation';
 import { useLatestRef } from './useLatestRef';
@@ -334,7 +334,6 @@ export function useNavigationSession({
     }
     onRouteProgressChangeRef.current?.(progressPayload);
 
-    const streakNeeded = arriveStreakRequired(shouldSimulateRef.current);
     const wps = waypointsListRef.current;
     const dest = endPointRef.current;
 
@@ -362,7 +361,13 @@ export function useNavigationSession({
 
       const next = (arriveStreakRef.current.get(key) ?? 0) + 1;
       arriveStreakRef.current.set(key, next);
-      if (next < streakNeeded) return;
+      const needed = arriveStreakForSample({
+        isSimulation: shouldSimulateRef.current,
+        key,
+        alongRemainingM: sample.alongRemainingM,
+        routeDistanceRemainingM: rem.distanceRemaining,
+      });
+      if (next < needed) return;
 
       arrivedWaypointKeysRef.current.add(key);
       arriveStreakRef.current.set(key, 0);

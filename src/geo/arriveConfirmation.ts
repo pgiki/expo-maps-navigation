@@ -6,7 +6,7 @@ import { polylineLengthMeters } from '../osrm/progress';
 import { snapToRoute } from './smoothNavigation';
 
 /** Live GPS proximity to target (metres). */
-export const ARRIVE_PROXIMITY_M = 15;
+export const ARRIVE_PROXIMITY_M = 25;
 
 /** Max along-route remaining distance to confirm arrive (metres). */
 export const ARRIVE_ALONG_REMAINING_M = 25;
@@ -47,9 +47,8 @@ function metresBetween(a: LatLng, b: LatLng): number {
 }
 
 /**
- * Proximity threshold: base 15m, expand with half of reported accuracy, capped.
- * Simulation may expand further with tick travel so end-of-route snaps still confirm
- * when the destination sits slightly off the polyline.
+ * Proximity threshold: base ARRIVE_PROXIMITY_M, expand with half of reported
+ * accuracy, capped. Simulation may expand further with tick travel.
  */
 export function arriveProximityThreshold(
   accuracyM = 0,
@@ -156,4 +155,26 @@ export function evaluateArriveSample(
  */
 export function arriveStreakRequired(isSimulation: boolean): number {
   return isSimulation ? 1 : ARRIVE_CONSECUTIVE;
+}
+
+/**
+ * Streak needed for this sample. At the destination with a clear arrive
+ * candidate, require only one sample — live GPS often goes idle once stopped
+ * (especially on iOS), so a 3-sample streak would never complete.
+ */
+export function arriveStreakForSample(input: {
+  isSimulation: boolean;
+  key: string;
+  alongRemainingM: number;
+  routeDistanceRemainingM: number;
+}): number {
+  const base = arriveStreakRequired(input.isSimulation);
+  if (
+    input.key === 'destination' &&
+    input.alongRemainingM <= ARRIVE_ALONG_REMAINING_M &&
+    input.routeDistanceRemainingM <= ARRIVE_ALONG_REMAINING_M
+  ) {
+    return 1;
+  }
+  return base;
 }

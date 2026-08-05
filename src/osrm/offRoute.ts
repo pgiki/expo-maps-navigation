@@ -19,6 +19,12 @@ export const OFF_ROUTE_ASSUMED_ACCURACY_M = 30;
 /** Minimum accuracy slack (m) added to the corridor threshold. */
 export const OFF_ROUTE_MIN_ACCURACY_SLACK_M = 25;
 
+/** Cap on accuracy slack so a bad / simulated GPS fix cannot disable reroute. */
+export const OFF_ROUTE_MAX_ACCURACY_SLACK_M = 50;
+
+/** Minimum time the "Rerouting…" chip stays visible (ms). */
+export const REROUTE_STATUS_MIN_MS = 1200;
+
 /** Grace after a successful reroute before detecting off-route again. */
 export const REROUTE_COOLDOWN_MS = 8000;
 
@@ -83,7 +89,11 @@ export function effectiveOffRouteThresholdM(
 ): number {
   const reported =
     accuracyM > 0 ? accuracyM : OFF_ROUTE_ASSUMED_ACCURACY_M;
-  return thresholdM + Math.max(reported, OFF_ROUTE_MIN_ACCURACY_SLACK_M);
+  const slack = Math.min(
+    OFF_ROUTE_MAX_ACCURACY_SLACK_M,
+    Math.max(reported, OFF_ROUTE_MIN_ACCURACY_SLACK_M)
+  );
+  return thresholdM + slack;
 }
 
 /**

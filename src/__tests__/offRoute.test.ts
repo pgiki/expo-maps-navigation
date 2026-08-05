@@ -6,11 +6,13 @@ import {
   isOffRouteSample,
   OFF_ROUTE_ASSUMED_ACCURACY_M,
   OFF_ROUTE_CONSECUTIVE,
+  OFF_ROUTE_MAX_ACCURACY_SLACK_M,
   OFF_ROUTE_MIN_DURATION_MS,
   OFF_ROUTE_THRESHOLD_M,
   REROUTE_COOLDOWN_MS,
   REROUTE_FAIL_BACKOFF_MS,
   REROUTE_STARTUP_GRACE_MS,
+  REROUTE_STATUS_MIN_MS,
 } from '../osrm/offRoute';
 
 describe('isOffRouteSample', () => {
@@ -21,9 +23,16 @@ describe('isOffRouteSample', () => {
   });
 
   it('expands threshold with reported accuracy', () => {
-    // effective = 50 + max(50, 25) = 100
+    // effective = 50 + max(50, 25) = 100 (uncapped at 50)
     expect(isOffRouteSample(60, 50)).toBe(false);
     expect(isOffRouteSample(120, 50)).toBe(true);
+  });
+
+  it('caps accuracy slack so huge reported accuracy cannot disable reroute', () => {
+    expect(effectiveOffRouteThresholdM(500)).toBe(
+      OFF_ROUTE_THRESHOLD_M + OFF_ROUTE_MAX_ACCURACY_SLACK_M
+    );
+    expect(isOffRouteSample(150, 500)).toBe(true);
   });
 
   it('assumes accuracy when OS reports none', () => {
@@ -82,5 +91,10 @@ describe('reroute cooldown constants', () => {
     expect(REROUTE_STARTUP_GRACE_MS).toBeGreaterThanOrEqual(
       REROUTE_COOLDOWN_MS
     );
+  });
+
+  it('keeps the rerouting chip visible long enough to read', () => {
+    expect(REROUTE_STATUS_MIN_MS).toBeGreaterThanOrEqual(800);
+    expect(REROUTE_STATUS_MIN_MS).toBeLessThanOrEqual(2000);
   });
 });

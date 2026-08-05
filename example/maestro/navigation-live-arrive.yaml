@@ -1,6 +1,7 @@
 appId: com.example.expomapsnavigation
 ---
-# Live GPS arrive: fast travel along corridor → end-of-route → Done → home.
+# Live GPS arrive: step setLocation along corridor (no Maestro travel — too slow).
+# Dense fixes near dest so the live smoother can confirm arrive streak.
 - launchApp:
     clearState: false
     stopApp: true
@@ -19,27 +20,93 @@ appId: com.example.expomapsnavigation
     id: "maneuver-banner"
 - assertVisible:
     id: "trip-progress"
-# Race corridor (~1.2 km @ 0.2 km/s ≈ 6s), then linger at dest for arrive streak
-- travel:
-    points:
-      - "30.699239, 76.6905161"
-      - "30.701982, 76.693183"
-      - "30.704476, 76.690653"
-      - "30.7085, 76.695"
-    speed: 0.2
+# Corridor hops
+- setLocation:
+    latitude: 30.701982
+    longitude: 76.693183
+- setLocation:
+    latitude: 30.704476
+    longitude: 76.690653
+- setLocation:
+    latitude: 30.7075
+    longitude: 76.694
+- setLocation:
+    latitude: 30.7085
+    longitude: 76.695
+# Approach dest then jitter slightly so iOS watchPosition keeps firing
+# (stationary fixes may not re-deliver; need ARRIVE_CONSECUTIVE=3).
+- setLocation:
+    latitude: 30.7088
+    longitude: 76.6952
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
+- setLocation:
+    latitude: 30.7090
+    longitude: 76.6954
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
+- setLocation:
+    latitude: 30.70915
+    longitude: 76.69555
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
 - setLocation:
     latitude: 30.709241
     longitude: 76.695669
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
+- setLocation:
+    latitude: 30.709245
+    longitude: 76.695672
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
+- setLocation:
+    latitude: 30.709238
+    longitude: 76.695665
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
 - setLocation:
     latitude: 30.709241
     longitude: 76.695669
-- setLocation:
-    latitude: 30.709241
-    longitude: 76.695669
+# Keep feeding tiny jitters until end-of-route (iOS may idle the watch)
+- repeat:
+    times: 20
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: "end-of-route"
+          commands:
+            - setLocation:
+                latitude: 30.709241
+                longitude: 76.695669
+            - swipe:
+                start: 50%, 4%
+                end: 50%, 4%
+                duration: 350
+            - setLocation:
+                latitude: 30.709248
+                longitude: 76.695675
+            - swipe:
+                start: 50%, 4%
+                end: 50%, 4%
+                duration: 350
 - extendedWaitUntil:
     visible:
       id: "end-of-route"
-    timeout: 45000
+    timeout: 20000
 - assertVisible: "You have arrived"
 - takeScreenshot: live-arrive-confirmed
 - tapOn: "Done"

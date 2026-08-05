@@ -1,6 +1,6 @@
 appId: com.example.expomapsnavigation
 ---
-# GPS spike must NOT auto-reroute: burn 15s grace with fast corridor travel, brief off, back on.
+# GPS spike must NOT auto-reroute: burn 15s grace, brief off, back on.
 # Assert rerouting-status stays not visible (spike < confirm window).
 - launchApp:
     clearState: false
@@ -20,31 +20,45 @@ appId: com.example.expomapsnavigation
     id: "maneuver-banner"
 - assertVisible:
     id: "trip-progress"
-# Burn past REROUTE_STARTUP_GRACE_MS (~16s wall-clock) at driving+ speed (~0.7 km / 0.04 ≈ 17s)
-- travel:
-    points:
-      - "30.699239, 76.6905161"
-      - "30.701982, 76.693183"
-      - "30.704476, 76.690653"
-    speed: 0.04
+# Burn past REROUTE_STARTUP_GRACE_MS (~16s) with shorter swipes
+- setLocation:
+    latitude: 30.701982
+    longitude: 76.693183
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
 - assertNotVisible:
     id: "rerouting-status"
-# Brief spike ~150m off, then immediately back (< OFF_ROUTE_MIN_DURATION_MS)
+# Brief spike west, then immediately back (< OFF_ROUTE_MIN_DURATION_MS)
 - setLocation:
-    latitude: 30.7005
-    longitude: 76.6885
+    latitude: 30.701982
+    longitude: 76.6910
 - setLocation:
-    latitude: 30.704476
-    longitude: 76.690653
+    latitude: 30.701982
+    longitude: 76.6895
+- setLocation:
+    latitude: 30.701982
+    longitude: 76.693183
 - takeScreenshot: live-gps-spike-recovered
-# Short on-route hold; chip must not appear
 - assertNotVisible:
     id: "rerouting-status"
-- travel:
-    points:
-      - "30.704476, 76.690653"
-      - "30.7055, 76.6915"
-    speed: 0.05
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 3000
 - assertNotVisible:
     id: "rerouting-status"
 - assertVisible:

@@ -4,6 +4,7 @@ import {
   ARRIVE_PROXIMITY_CAP_M,
   ARRIVE_PROXIMITY_M,
   arriveProximityThreshold,
+  arriveStreakForSample,
   arriveStreakRequired,
   evaluateArriveSample,
 } from '../geo/arriveConfirmation';
@@ -135,5 +136,29 @@ describe('arriveStreakRequired', () => {
   it('requires one sample for simulation and three for live GPS', () => {
     expect(arriveStreakRequired(true)).toBe(1);
     expect(arriveStreakRequired(false)).toBe(3);
+  });
+});
+
+describe('arriveStreakForSample', () => {
+  it('collapses to one sample at the destination when remaining is low', () => {
+    expect(
+      arriveStreakForSample({
+        isSimulation: false,
+        key: 'destination',
+        alongRemainingM: 10,
+        routeDistanceRemainingM: 12,
+      })
+    ).toBe(1);
+  });
+
+  it('keeps the live streak for mid-trip waypoints', () => {
+    expect(
+      arriveStreakForSample({
+        isSimulation: false,
+        key: 'wp-0',
+        alongRemainingM: 10,
+        routeDistanceRemainingM: 800,
+      })
+    ).toBe(3);
   });
 });

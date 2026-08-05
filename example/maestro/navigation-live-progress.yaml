@@ -22,13 +22,14 @@ appId: com.example.expomapsnavigation
 - assertVisible:
     id: "trip-eta"
 # Mid corridor (shop) then near end — instant fixes, no crawl
+# Prefer trip-eta: nested trip-distance Text is often missing from iOS a11y tree
 - setLocation:
     latitude: 30.701982
     longitude: 76.693183
-- extendedWaitUntil:
-    visible:
-      id: "trip-distance"
-    timeout: 15000
+- assertVisible:
+    id: "trip-eta"
+- assertVisible:
+    id: "trip-progress"
 - assertVisible:
     id: "navigation-view"
 - assertVisible:

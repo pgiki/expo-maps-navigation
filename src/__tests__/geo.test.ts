@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   courseAlongRouteTurf,
+  NavigationSmoother,
+  SMOOTH_TELEPORT_CATCHUP_M,
   snapToRoute,
 } from '../geo/smoothNavigation';
 import { isOffRouteSample } from '../osrm/offRoute';
@@ -93,5 +95,19 @@ describe('resolveHeading', () => {
     expect(resolveHeading(Number.NaN, 10)).toBe(10);
     expect(resolveHeading(undefined, 7)).toBe(7);
     expect(resolveHeading(90, 0)).toBe(90);
+  });
+});
+
+describe('NavigationSmoother teleport catch-up', () => {
+  it(`snaps display when the next target is ≥ ${SMOOTH_TELEPORT_CATCHUP_M}m away`, () => {
+    const smoother = new NavigationSmoother();
+    smoother.reset({ latitude: 0, longitude: 0 }, 90);
+    const far = { latitude: 0, longitude: 0.001 }; // ~111m east
+    const out = smoother.update(
+      { ...far, heading: 90, accuracy: 5, speed: 0 },
+      line
+    );
+    expect(out.longitude).toBeCloseTo(far.longitude, 5);
+    expect(out.latitude).toBeCloseTo(far.latitude, 5);
   });
 });

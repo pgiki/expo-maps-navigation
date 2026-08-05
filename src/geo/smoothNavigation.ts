@@ -11,6 +11,11 @@ export const SMOOTH_BEARING_GATE_DEG = 10;
 export const SMOOTH_IDLE_SPEED_MPS = 0.45;
 /** Default snap corridor width (metres) — mirrors OFF_ROUTE_THRESHOLD_M. */
 export const SMOOTH_SNAP_THRESHOLD_M = 50;
+/**
+ * Jump this far (or more) and snap the display immediately.
+ * Pure lerp stalls when the next fix is idle (common on iOS after a teleport).
+ */
+export const SMOOTH_TELEPORT_CATCHUP_M = 35;
 
 type Coord = [number, number];
 
@@ -162,9 +167,11 @@ export class NavigationSmoother {
       { units: 'meters' }
     );
 
-    // Idle GPS jitter: do not chase sub-metre snap noise when stopped.
-    if (!movingFast && toTargetM < 1.25) {
-      // keep display
+    // Hard catch-up on teleports / large GPS jumps (lerp stalls when idle).
+    if (toTargetM >= SMOOTH_TELEPORT_CATCHUP_M) {
+      this.display = { ...nextTarget };
+    } else if (!movingFast && toTargetM < 1.25) {
+      // Idle GPS jitter: do not chase sub-metre snap noise when stopped.
     } else {
       const alpha = SMOOTH_LERP_ALPHA;
       this.display = {

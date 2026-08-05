@@ -66,9 +66,11 @@ export {
   OFF_ROUTE_THRESHOLD_M,
   OFF_ROUTE_CONSECUTIVE,
   OFF_ROUTE_MIN_DURATION_MS,
+  OFF_ROUTE_MAX_ACCURACY_SLACK_M,
   REROUTE_COOLDOWN_MS,
   REROUTE_FAIL_BACKOFF_MS,
   REROUTE_STARTUP_GRACE_MS,
+  REROUTE_STATUS_MIN_MS,
 } from './osrm/offRoute';
 
 export type { NearestPointResult } from './osrm/offRoute';
@@ -81,6 +83,7 @@ export {
   SMOOTH_MOVE_GATE_M,
   SMOOTH_BEARING_GATE_DEG,
   SMOOTH_SNAP_THRESHOLD_M,
+  SMOOTH_TELEPORT_CATCHUP_M,
 } from './geo/smoothNavigation';
 
 export type {
@@ -94,6 +97,7 @@ export {
   arriveProximityThreshold,
   arriveAlongRemainingThreshold,
   arriveStreakRequired,
+  arriveStreakForSample,
   ARRIVE_PROXIMITY_M,
   ARRIVE_ALONG_REMAINING_M,
   ARRIVE_CONSECUTIVE,

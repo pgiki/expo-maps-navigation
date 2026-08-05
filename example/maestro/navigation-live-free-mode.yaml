@@ -17,8 +17,11 @@ appId: com.example.expomapsnavigation
     timeout: 60000
 - assertVisible:
     id: "maneuver-banner"
-- assertVisible:
-    id: "map-follow-surface"
+# Wait for follow to arm (live GPS can settle briefly after first fix)
+- extendedWaitUntil:
+    visible:
+      id: "map-follow-surface"
+    timeout: 20000
 - assertNotVisible:
     id: "recenter-button"
 - setLocation:

@@ -6,6 +6,7 @@ import { formatOsrmError } from '../osrm/errors';
 import { DEFAULT_OSRM_BASE_URL } from '../osrm/client';
 import type { OsrmRoute } from '../osrm/client';
 import { travelModeToProfile } from '../osrm/instructions';
+import { REROUTE_STATUS_MIN_MS } from '../osrm/offRoute';
 import { createOsrmRouterAdapter } from '../router/createOsrmRouterAdapter';
 import type { RouterAdapter } from '../router/types';
 import { useLatestRef } from './useLatestRef';
@@ -207,6 +208,7 @@ export function useOsrmRoute({
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      const shownAt = Date.now();
       setRerouting(true);
 
       const legIndex = options?.currentLegIndex ?? 0;
@@ -256,7 +258,14 @@ export function useOsrmRoute({
         onErrorRef.current?.(message);
         return false;
       } finally {
-        if (!controller.signal.aborted) setRerouting(false);
+        if (!controller.signal.aborted) {
+          // Keep the chip readable — fast OSRM replies otherwise flash <100ms.
+          const wait = REROUTE_STATUS_MIN_MS - (Date.now() - shownAt);
+          if (wait > 0) {
+            await new Promise((r) => setTimeout(r, wait));
+          }
+          if (!controller.signal.aborted) setRerouting(false);
+        }
       }
     },
     [endPoint.latitude, endPoint.longitude, travelMode, language, bumpGeneration, waypointsRef, routerRef, onErrorRef]

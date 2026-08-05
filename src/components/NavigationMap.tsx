@@ -564,7 +564,12 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
       });
       if (!decision.update) return;
 
-      programmaticMoveUntil.current = Date.now() + moveGuardMs;
+      // Longer settle after force/arm so live GPS / MapKit load events don't
+      // immediately drop into free mode before FollowBreakSurface is usable.
+      const guardMs = config.force
+        ? Math.max(moveGuardMs, platform === 'ios' ? 1200 : 600)
+        : moveGuardMs;
+      programmaticMoveUntil.current = Date.now() + guardMs;
       lastCameraAt.current = Date.now();
       lastCameraPos.current = {
         latitude: config.coordinates.latitude,
@@ -641,11 +646,13 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
     }) => {
       if (!followUserRef.current) return;
       if (Date.now() < programmaticMoveUntil.current) return;
+      // Live GPS: MapKit often fires camera events before the first follow
+      // frame is armed. Without a programmatic target, treat as settle noise.
+      if (lastCameraPos.current == null) return;
 
       const lat = event?.coordinates?.latitude;
       const lon = event?.coordinates?.longitude;
       if (
-        lastCameraPos.current != null &&
         lat != null &&
         lon != null &&
         Number.isFinite(lat) &&
@@ -664,6 +671,9 @@ export const NavigationMap = forwardRef<NavigationMapHandle, Props>(
             : 0;
         // Animation settle / float noise around the last programmatic target.
         if (moved < 20 && turned < 12) return;
+      } else {
+        // No usable coordinates — ignore (don't drop into free mode).
+        return;
       }
 
       onCameraMoveByUser?.();

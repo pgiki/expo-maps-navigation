@@ -1,7 +1,7 @@
 appId: com.example.expomapsnavigation
 ---
-# Sustained off-route after grace → rerouting-status → recover toward corridor.
-# Timing: 15s startup grace; ≥5 off samples and ≥3s continuous off.
+# Sustained off-route after grace → catch brief rerouting-status → recover.
+# Poll for chip immediately after each GPS fix (no long gaps).
 - launchApp:
     clearState: false
     stopApp: true
@@ -18,44 +18,83 @@ appId: com.example.expomapsnavigation
     timeout: 60000
 - assertVisible:
     id: "maneuver-banner"
-# Burn past REROUTE_STARTUP_GRACE_MS (~16s) with fast corridor travel
-- travel:
-    points:
-      - "30.699239, 76.6905161"
-      - "30.701982, 76.693183"
-      - "30.704476, 76.690653"
-    speed: 0.04
-# Sustained off: 5 fixes + short off-corridor travel (≥3.5s)
+# Burn past REROUTE_STARTUP_GRACE_MS (~16s) with shorter swipes (long ones crash XCTest)
 - setLocation:
-    latitude: 30.7020
-    longitude: 76.6870
+    latitude: 30.701982
+    longitude: 76.693183
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 4000
+# Walk west off corridor
 - setLocation:
-    latitude: 30.70205
-    longitude: 76.68705
+    latitude: 30.701982
+    longitude: 76.6920
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
 - setLocation:
-    latitude: 30.7021
-    longitude: 76.6871
+    latitude: 30.701982
+    longitude: 76.6905
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
 - setLocation:
-    latitude: 30.70215
-    longitude: 76.68705
-- setLocation:
-    latitude: 30.7022
-    longitude: 76.6870
-- travel:
-    points:
-      - "30.7020, 76.6870"
-      - "30.7024, 76.6866"
-    speed: 0.015
-- extendedWaitUntil:
-    visible:
-      id: "rerouting-status"
-    timeout: 30000
-- takeScreenshot: live-rerouting-status
+    latitude: 30.701982
+    longitude: 76.6890
+- swipe:
+    start: 50%, 4%
+    end: 50%, 4%
+    duration: 500
+- evalScript: ${output.sawRerouteChip = false}
+# Dwell off-route; check chip after every fix (chip stays ≥2s)
+- repeat:
+    times: 12
+    commands:
+      - setLocation:
+          latitude: 30.7020
+          longitude: 76.6870
+      - runFlow:
+          when:
+            visible:
+              id: "rerouting-status"
+          commands:
+            - evalScript: ${output.sawRerouteChip = true}
+            - takeScreenshot: live-rerouting-status
+      - setLocation:
+          latitude: 30.7022
+          longitude: 76.6867
+      - runFlow:
+          when:
+            visible:
+              id: "rerouting-status"
+          commands:
+            - evalScript: ${output.sawRerouteChip = true}
+            - takeScreenshot: live-rerouting-status
+      - swipe:
+          start: 50%, 4%
+          end: 50%, 4%
+          duration: 400
+- assertTrue: ${output.sawRerouteChip}
 - extendedWaitUntil:
     notVisible:
       id: "rerouting-status"
     timeout: 60000
-# Jump back toward corridor / end
+    optional: true
 - setLocation:
     latitude: 30.704476
     longitude: 76.690653

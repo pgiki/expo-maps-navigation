@@ -48,10 +48,12 @@ Must match production (`src/osrm/offRoute.ts`):
 | `OFF_ROUTE_CONSECUTIVE` | **5** | Consecutive off-route samples |
 | `OFF_ROUTE_MIN_DURATION_MS` | **3s** | Continuous off-route before confirm |
 
-Live spike / reroute flows burn past the 15s grace with on-corridor `travel` (~0.04 km/s over Shop→Cafe, ~16s wall-clock — grace cannot be shortened). Other live flows use instant `setLocation` jumps or fast `travel` (~0.2 km/s) so the suite stays short.
+Live spike / reroute flows burn past the 15s grace with short banner-band `swipe` waits (long single swipes can crash XCTest), then either:
 
 - **Spike:** brief far jump → back on corridor → assert `rerouting-status` stays **not** visible
-- **Reroute:** sustained off (≥5 samples / ≥3s) → assert `rerouting-status` appears
+- **Reroute:** walk off in small steps (iOS drops large teleports), poll for brief `rerouting-status` (chip stays ≥2s)
+
+Other live flows use instant `setLocation` hops (arrive steps densely near the destination so the live smoother can confirm).
 
 ## Flows
 
