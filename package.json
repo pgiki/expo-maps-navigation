@@ -93,7 +93,7 @@
     "expo-location": "~57.0.7",
     "expo-maps": "~57.0.1",
     "expo-speech": "~57.0.1",
-    "lucide-react-native": "^1.28.0",
+    "lucide-react-native": "^1.30.0",
     "react": "19.2.3",
     "react-native": "0.86.2",
     "react-native-builder-bob": "^0.40.0",
